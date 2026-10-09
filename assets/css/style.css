@@ -43,8 +43,9 @@ a:hover { color: var(--gold); }
   border-bottom: 1px solid var(--line);
 }
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 62px; }
-.brand { font-family: var(--display); font-size: 24px; letter-spacing: 0.5px; color: var(--text); text-decoration: none; text-transform: uppercase; }
-.brand b { color: var(--ember); font-weight: 400; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-family: "Outfit", var(--body); font-weight: 700; font-size: 21px; letter-spacing: 1.5px; color: var(--text); text-decoration: none; }
+.brand:hover { color: var(--text); }
+.brand-mark { width: 30px; height: 30px; border-radius: 7px; flex: none; }
 .code-pill {
   font-family: var(--mono); font-size: 13px; color: var(--gold);
   border: 1px solid #5a3f17; background: #1f170b; border-radius: 999px; padding: 6px 12px;

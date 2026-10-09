@@ -95,3 +95,6 @@
   .bar-actions .mini { padding: 7px 9px; }
   .save-row .btn { width: auto; }
 }
+@media (max-width: 480px) {
+  .admin .brand > span { display: none; }
+}
