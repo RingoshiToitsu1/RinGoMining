@@ -35,9 +35,56 @@
     el.href = C.REF_LINK; el.target = "_blank"; el.rel = "noopener";
   });
 
-  // google form embeds
+  // native themed forms -> post into Google Forms
+  var nativeReady = {};
+  document.querySelectorAll("form[data-native]").forEach(function (form) {
+    var key = form.getAttribute("data-native");
+    var map = C["ENTRIES_" + key] || {};
+    var id = C["FORM_" + key + "_ID"];
+    var ok = id && Object.keys(map).length && Object.keys(map).every(function (k) { return map[k]; });
+    if (!ok) return;
+    nativeReady[key] = true;
+    form.hidden = false;
+    document.querySelectorAll("[data-embed-only]").forEach(function (el) { el.hidden = true; });
+
+    var err = form.querySelector(".form-error");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      err.hidden = true;
+      if (!form.checkValidity()) {
+        var bad = form.querySelector(":invalid");
+        var f = bad && bad.closest(".field");
+        var name = f ? (f.querySelector("label, .lbl").firstChild.textContent || "").trim() : "a field";
+        err.textContent = "Please fill in: " + name;
+        err.hidden = false;
+        if (bad) bad.focus();
+        return;
+      }
+      var data = new URLSearchParams();
+      new FormData(form).forEach(function (v, k) {
+        if (map[k] && String(v).trim()) data.append("entry." + map[k], String(v).trim());
+      });
+      var btn = form.querySelector("button[type=submit]");
+      var label = btn.textContent; btn.disabled = true; btn.textContent = "Sending…";
+      fetch("https://docs.google.com/forms/d/e/" + id + "/formResponse", {
+        method: "POST", mode: "no-cors", body: data
+      }).then(function () {
+        form.hidden = true;
+        var s = document.querySelector('[data-success="' + key + '"]');
+        if (s) { s.hidden = false; s.scrollIntoView({ behavior: "smooth", block: "center" }); }
+        try { localStorage.setItem("ringo_" + key, "1"); } catch (x) {}
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = label;
+        err.textContent = "Couldn't send. Check your connection and try again, or message me on Telegram.";
+        err.hidden = false;
+      });
+    });
+  });
+
+  // google form embeds (fallback when native form isn't configured)
   document.querySelectorAll("[data-form]").forEach(function (box) {
     var key = box.getAttribute("data-form");
+    if (nativeReady[key]) { box.remove(); return; }
     var url = C["FORM_" + key + "_URL"];
     var h = C["FORM_" + key + "_HEIGHT"] || 1200;
     if (url) {

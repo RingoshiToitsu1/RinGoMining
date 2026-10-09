@@ -33,6 +33,24 @@
       <li><span>3</span><div><strong>Fill out the form below</strong><p>Paste your GoMining ID and wallet details and hit submit.</p></div></li>
     </ul>
 
+    <form class="native-form" data-native="STEP3" hidden novalidate>
+      <div class="field-row">
+        <div class="field"><label for="g-email">Email you used in Step 1</label><input id="g-email" name="email" type="email" autocomplete="email" required></div>
+        <div class="field"><label for="g-id">GoMining ID <em>(numbers only)</em></label><input id="g-id" name="gmid" inputmode="numeric" pattern="[0-9]+" placeholder="e.g. 3566334" required></div>
+      </div>
+      <div class="field"><span class="lbl">Payout coin</span><div class="chips"><label><input type="radio" name="coin" value="USDC" required><span>USDC</span></label><label><input type="radio" name="coin" value="Bitcoin"><span>Bitcoin</span></label><label><input type="radio" name="coin" value="GoMining token (GMT)"><span>GoMining token (GMT)</span></label></div></div>
+      <div class="field"><label for="g-chain">Chain / network</label><input id="g-chain" name="chain" placeholder="Ethereum, BNB Chain, Polygon, Solana, Bitcoin…" required></div>
+      <div class="field"><label for="g-wallet">Wallet address <em>(double-check it, wrong addresses can't be recovered)</em></label><input id="g-wallet" name="wallet" autocomplete="off" spellcheck="false" required></div>
+      <div class="field"><label for="g-notes">Anything else I should know? <em>(optional)</em></label><textarea id="g-notes" name="notes" rows="3"></textarea></div>
+      <p class="form-error" hidden></p>
+      <button class="btn btn-fire btn-block" type="submit">Send my claim →</button>
+      <p class="form-fine">By submitting, you agree to the <a href="disclaimer.html">bonus terms and disclaimer</a>. RinGoMining is an independent ambassador, not affiliated with GoMining.</p>
+    </form>
+    <div class="form-success" data-success="STEP3" hidden>
+      <h3>You're in.</h3>
+      <p>I'll confirm your account is under RINGO5, then reach out on the contact method you gave me. Your bonus goes out within 24 hours of confirmation.</p>
+      <a class="btn btn-ghost btn-block" href="index.html#calculator">Run my numbers while you wait</a>
+    </div>
     <div data-form="STEP3" class="form-missing">
         <p><strong>The form is loading slowly or isn't connected yet.</strong></p>
         <p>No problem. Message me on Telegram at <a data-tg>@RingoShitoitsu</a> or call/text <a data-phone>906-235-5711</a> with your GoMining ID, payout coin, chain, and wallet address, and I'll set you up by hand.</p>

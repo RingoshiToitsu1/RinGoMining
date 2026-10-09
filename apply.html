@@ -25,14 +25,34 @@
     <p class="step-label">Step 1 of 3</p>
     <h1>Tell me who you are</h1>
     <p class="lede">Takes about a minute. This is how I know you're coming in on my code, and how I reach you to pay your bonus.</p>
+    <form class="native-form" data-native="STEP1" hidden novalidate>
+      <div class="field"><label for="f-name">Full name</label><input id="f-name" name="name" autocomplete="name" required></div>
+      <div class="field-row">
+        <div class="field"><label for="f-email">Email <em>(use the one you'll sign up to GoMining with)</em></label><input id="f-email" name="email" type="email" autocomplete="email" required></div>
+        <div class="field"><label for="f-phone">Phone <em>(optional)</em></label><input id="f-phone" name="phone" type="tel" autocomplete="tel"></div>
+      </div>
+      <div class="field"><label for="f-tg">Telegram handle <em>(optional)</em></label><input id="f-tg" name="telegram" placeholder="@yourname"></div>
+      <div class="field"><span class="lbl">How much are you planning to start with?</span><div class="chips"><label><input type="radio" name="amount" value="Just the first terahash" required><span>Just the first terahash</span></label><label><input type="radio" name="amount" value="$100 – $499"><span>$100 – $499</span></label><label><input type="radio" name="amount" value="$500 – $999"><span>$500 – $999</span></label><label><input type="radio" name="amount" value="$1,000 – $4,999"><span>$1,000 – $4,999</span></label><label><input type="radio" name="amount" value="$5,000 – $10,000"><span>$5,000 – $10,000</span></label><label><input type="radio" name="amount" value="$10,000+"><span>$10,000+</span></label></div></div>
+      <div class="field"><span class="lbl">How do you want your bonus paid?</span><div class="chips"><label><input type="radio" name="coin" value="USDC" required><span>USDC</span></label><label><input type="radio" name="coin" value="Bitcoin"><span>Bitcoin</span></label><label><input type="radio" name="coin" value="GoMining token (GMT)"><span>GoMining token (GMT)</span></label></div></div>
+      <div class="field"><span class="lbl">Best way to reach you?</span><div class="chips"><label><input type="radio" name="contact" value="Telegram" required><span>Telegram</span></label><label><input type="radio" name="contact" value="Text"><span>Text</span></label><label><input type="radio" name="contact" value="Call"><span>Call</span></label><label><input type="radio" name="contact" value="Email"><span>Email</span></label></div></div>
+      <div class="field"><label for="f-q">Questions or concerns? <em>(optional)</em></label><textarea id="f-q" name="questions" rows="4" placeholder="Anything holding you back? Ask. I'll answer straight."></textarea></div>
+      <p class="form-error" hidden></p>
+      <button class="btn btn-fire btn-block" type="submit">Send my info →</button>
+      <p class="form-fine">Your info is only used to confirm your referral, contact you, and pay your bonus. <a href="disclaimer.html">Disclaimer</a>.</p>
+    </form>
+    <div class="form-success" data-success="STEP1" hidden>
+      <h3>Got it. You're on my list.</h3>
+      <p>Next: create your GoMining account with code RINGO5.</p>
+      <a class="btn btn-fire btn-block" href="signup.html">Go to Step 2 →</a>
+    </div>
     <div data-form="STEP1" class="form-missing">
         <p><strong>The form is loading slowly or isn't connected yet.</strong></p>
         <p>No problem. Message me on Telegram at <a data-tg>@RingoShitoitsu</a> or call/text <a data-phone>906-235-5711</a> with your name, email, and how much you're planning to start with, and I'll set you up by hand.</p>
       </div>
-    <div class="note"><strong>Hit submit on the form,</strong> then come right back here and tap the button below. Step 2 is where you create your GoMining account with code RINGO5.</div>
+    <div class="note" data-embed-only><strong>Hit submit on the form,</strong> then come right back here and tap the button below. Step 2 is where you create your GoMining account with code RINGO5.</div>
     <div class="nav-row">
       <a class="btn btn-ghost" href="index.html">← Back</a>
-      <a class="btn btn-fire" href="signup.html">I submitted it. Step 2 →</a>
+      <a class="btn btn-fire" href="signup.html" data-embed-only>I submitted it. Step 2 →</a>
     </div>
   </div>
 </main>

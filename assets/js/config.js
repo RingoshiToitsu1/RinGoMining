@@ -17,6 +17,19 @@ window.RINGO = {
   FORM_STEP1_URL: "https://docs.google.com/forms/d/e/1FAIpQLScOK7XSQGdnT_YSp_F5lWhD6iAQhEGl_h1CiCEVTOmNLYeGCQ/viewform?embedded=true",
   FORM_STEP1_HEIGHT: 1500,
 
+  // Native (themed) forms post straight into the Google Forms above.
+  // Fill in the entry IDs from tools/get-entry-ids.gs. While any are blank,
+  // the page falls back to the embedded Google Form.
+  FORM_STEP1_ID: "1FAIpQLScOK7XSQGdnT_YSp_F5lWhD6iAQhEGl_h1CiCEVTOmNLYeGCQ",
+  ENTRIES_STEP1: {
+    name: "", phone: "", email: "", telegram: "",
+    amount: "", coin: "", contact: "", questions: ""
+  },
+  FORM_STEP3_ID: "1FAIpQLScyyyqncXMLBvEnuPbySYCatVUxgiNN41iwND8ilgJKbC_hAQ",
+  ENTRIES_STEP3: {
+    email: "", gmid: "", coin: "", chain: "", wallet: "", notes: ""
+  },
+
   FORM_STEP3_URL: "https://docs.google.com/forms/d/e/1FAIpQLScyyyqncXMLBvEnuPbySYCatVUxgiNN41iwND8ilgJKbC_hAQ/viewform?embedded=true",
   FORM_STEP3_HEIGHT: 1100
 };
