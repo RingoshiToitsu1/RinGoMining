@@ -32,6 +32,9 @@
     if (!API) return Promise.reject(new Error("Admin backend URL isn't set in assets/js/config.js (ADMIN_API)."));
     body.user = creds.user; body.pass = creds.pass;
     return fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) })
+      .catch(function () {
+        throw new Error("Can't reach the backend. In Apps Script, check the deployment's access is set to \"Anyone\".");
+      })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j.ok) {
