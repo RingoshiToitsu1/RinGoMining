@@ -14,9 +14,9 @@ window.RINGO = {
   TELEGRAM: "RingoShitoitsu",
   PHONE: "906-235-5711",
 
-  FORM_STEP1_URL: "",
+  FORM_STEP1_URL: "https://docs.google.com/forms/d/e/1FAIpQLScOK7XSQGdnT_YSp_F5lWhD6iAQhEGl_h1CiCEVTOmNLYeGCQ/viewform?embedded=true",
   FORM_STEP1_HEIGHT: 1500,
 
-  FORM_STEP3_URL: "",
+  FORM_STEP3_URL: "https://docs.google.com/forms/d/e/1FAIpQLScyyyqncXMLBvEnuPbySYCatVUxgiNN41iwND8ilgJKbC_hAQ/viewform?embedded=true",
   FORM_STEP3_HEIGHT: 1100
 };
