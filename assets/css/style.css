@@ -44,8 +44,10 @@ a:hover { color: var(--gold); }
 }
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 62px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-family: "Outfit", var(--body); font-weight: 700; font-size: 21px; letter-spacing: 1.5px; color: var(--text); text-decoration: none; }
-.brand:hover { color: var(--text); }
-.brand-mark { width: 30px; height: 30px; border-radius: 7px; flex: none; }
+.brand { transition: color .18s ease; }
+.brand:hover, .brand:focus-visible { color: var(--ember); }
+.brand-mark { width: 30px; height: 30px; border-radius: 7px; flex: none; transition: transform .18s ease, box-shadow .18s ease; }
+.brand:hover .brand-mark, .brand:focus-visible .brand-mark { transform: translateY(-1px) scale(1.06); box-shadow: 0 0 0 2px rgba(255,106,26,.35), 0 6px 18px -4px rgba(255,106,26,.7); }
 .code-pill {
   font-family: var(--mono); font-size: 13px; color: var(--gold);
   border: 1px solid #5a3f17; background: #1f170b; border-radius: 999px; padding: 6px 12px;
