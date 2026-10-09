@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RinGoMining Admin</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0b0907">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="admin">
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="index.html">RinGo<b>Mining</b> <small class="tag">Admin</small></a>
+    <div class="bar-actions" id="barActions" hidden>
+      <button class="mini" id="refreshBtn" type="button">↻ Refresh</button>
+      <button class="mini" id="logoutBtn" type="button">Log out</button>
+    </div>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<main id="loginView" class="login-wrap">
+  <form id="loginForm" class="native-form login-card" novalidate>
+    <h1>Lead tracker</h1>
+    <p class="muted">Private. Log in to see your RINGO5 referrals.</p>
+    <div class="field"><label for="u">Username</label><input id="u" name="user" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
+    <div class="field"><label for="p">Password</label><input id="p" name="pass" type="password" autocomplete="current-password" required></div>
+    <label class="remember"><input type="checkbox" id="remember"> Keep me logged in on this device</label>
+    <p class="form-error" id="loginErr" hidden></p>
+    <button class="btn btn-fire btn-block" type="submit" id="loginBtn">Log in</button>
+  </form>
+</main>
+
+<!-- APP -->
+<main id="appView" hidden>
+  <div class="wrap">
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <input class="search" id="search" type="search" placeholder="Search name, email, ID, wallet…">
+    </div>
+
+    <div id="list" class="leads"></div>
+    <p class="empty" id="empty" hidden>No leads here yet.</p>
+  </div>
+</main>
+
+<div class="toast"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/admin.js"></script>
+</body>
+</html>

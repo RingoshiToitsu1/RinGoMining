@@ -31,6 +31,10 @@ window.RINGO = {
     chain: "1918993367", wallet: "505577898", notes: "1775599723"
   },
 
+  // Admin lead tracker backend (Apps Script web app URL ending in /exec).
+  // Protected by your username/password, which are never stored in this repo.
+  ADMIN_API: "",
+
   FORM_STEP3_URL: "https://docs.google.com/forms/d/e/1FAIpQLScyyyqncXMLBvEnuPbySYCatVUxgiNN41iwND8ilgJKbC_hAQ/viewform?embedded=true",
   FORM_STEP3_HEIGHT: 1100
 };

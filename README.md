@@ -40,3 +40,10 @@ Make two forms at forms.google.com, then paste each embed URL into `assets/js/co
 For each form: **Send → `< >` (embed) → copy the `src="…"` URL** and paste it into `FORM_STEP1_URL` / `FORM_STEP3_URL`. Turn on Settings → Responses → **Collect email addresses** off (we ask for it), and link both forms to one Google Sheet so you can match people by email.
 
 Until a URL is filled in, each step shows a Telegram/phone fallback so nobody gets stuck.
+
+## Admin lead tracker (`admin.html`)
+
+Private page to track every lead (New → Reached out → Waiting on purchase → Confirmed → Paid).
+Data lives in the RinGoMining Leads sheet; tracking is saved to its **Tracker** tab.
+The backend is `tools/admin-backend.gs` (an Apps Script web app). The login is checked there,
+so no password is stored in this repo. Paste the web app URL into `ADMIN_API` in `assets/js/config.js`.
