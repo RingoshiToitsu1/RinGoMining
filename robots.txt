@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /tools/
+
+Sitemap: https://ringomining.com/sitemap.xml
