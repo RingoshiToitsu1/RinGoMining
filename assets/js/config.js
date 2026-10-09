@@ -33,7 +33,7 @@ window.RINGO = {
 
   // Admin lead tracker backend (Apps Script web app URL ending in /exec).
   // Protected by your username/password, which are never stored in this repo.
-  ADMIN_API: "",
+  ADMIN_API: "https://script.google.com/macros/s/AKfycbw1EZtvAbIjBbC9wiene_4K7Gus9erTAjSMC-BS0nOpGv9dnfGeTwAvOt6fqMBlvMJL/exec",
 
   FORM_STEP3_URL: "https://docs.google.com/forms/d/e/1FAIpQLScyyyqncXMLBvEnuPbySYCatVUxgiNN41iwND8ilgJKbC_hAQ/viewform?embedded=true",
   FORM_STEP3_HEIGHT: 1100
