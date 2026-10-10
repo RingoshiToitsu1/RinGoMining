@@ -157,7 +157,8 @@ BLOCKS["VIDEOS"] = videos_block()
 # ---------------------------------------------------------------- page shell
 def head(meta, url, extra_ld):
     t, d = esc(meta["title"]), esc(meta["description"])
-    img = DOMAIN + meta.get("image", "/assets/img/og-image.jpg")
+    own = f"/assets/img/og/{meta.get('slug', '')}.jpg"
+    img = DOMAIN + meta.get("image", own if (ROOT / own.lstrip("/")).exists() else "/assets/img/og-image.jpg")
     ld = [{
         "@context": "https://schema.org", "@type": "Article",
         "headline": meta["h1_plain"], "description": meta["description"],
@@ -192,6 +193,7 @@ def head(meta, url, extra_ld):
   <meta property="og:image" content="{img}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{t}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{t}">
   <meta name="twitter:description" content="{d}">
