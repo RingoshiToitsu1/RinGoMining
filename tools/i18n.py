@@ -13,10 +13,10 @@ HUB_SLUG = {"en": "guides", "fr": "guides", "es": "guias", "de": "ratgeber"}
 # Root (hand-written) pages and their address in each language.
 ROOT_PAGES = {
     "home": {l: (PREFIX[l] + "/") for l in LANG_ORDER},
-    "apply": {l: PREFIX[l] + "/apply.html" for l in LANG_ORDER},
-    "signup": {l: PREFIX[l] + "/signup.html" for l in LANG_ORDER},
-    "verify": {l: PREFIX[l] + "/verify.html" for l in LANG_ORDER},
-    "disclaimer": {l: PREFIX[l] + "/disclaimer.html" for l in LANG_ORDER},
+    "apply": {l: PREFIX[l] + "/apply" for l in LANG_ORDER},
+    "signup": {l: PREFIX[l] + "/signup" for l in LANG_ORDER},
+    "verify": {l: PREFIX[l] + "/verify" for l in LANG_ORDER},
+    "disclaimer": {l: PREFIX[l] + "/disclaimer" for l in LANG_ORDER},
 }
 
 MONTHS = {

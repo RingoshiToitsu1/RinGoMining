@@ -26,8 +26,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TR = ROOT / "tools" / "i18n_root"
 DOMAIN = "https://ringomining.com"
 FILES = ["index.html", "apply.html", "signup.html", "verify.html", "disclaimer.html"]
-ROOT_KEY = {"index.html": "/", "apply.html": "/apply.html", "signup.html": "/signup.html",
-            "verify.html": "/verify.html", "disclaimer.html": "/disclaimer.html"}
+ROOT_KEY = {"index.html": "/", "apply.html": "/apply", "signup.html": "/signup",
+            "verify.html": "/verify", "disclaimer.html": "/disclaimer"}
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 ATTRS = ("alt", "placeholder", "title", "aria-label")
 KEEP = {"RINGOMINING", "CODE: RINGO5 ⧉", "Ethereum · Uniswap V2", "150B SHIB", "292.54 ETH", "ringoshi.eth",
@@ -201,9 +201,8 @@ def localize_links(doc, lang, slug_map):
     doc = re.sub(r'(href|src)="(assets/|favicon\.ico|site\.webmanifest)', r'\1="/\2', doc)
     doc = doc.replace("url(\"../img/", "url(\"/assets/img/")
     # root pages
-    for f in ["apply.html", "signup.html", "verify.html", "disclaimer.html"]:
-        doc = re.sub(r'href="/?%s' % re.escape(f), f'href="{P}/{f}', doc)
-    doc = re.sub(r'href="/?index\.html', f'href="{P}/', doc)
+    for f in ["apply", "signup", "verify", "disclaimer"]:
+        doc = re.sub(r'href="/?%s(?=["#?])' % f, f'href="{P}/{f}', doc)
     doc = doc.replace('href="/#', f'href="{P}/#').replace('href="/"', f'href="{P}/"')
     doc = doc.replace('href="/guides/"', f'href="{P}/{HUB_SLUG[lang]}/"')
     for order, slugs in slug_map.items():

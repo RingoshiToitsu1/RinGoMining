@@ -66,7 +66,7 @@ def blocks(lang):
     <strong>{t['hint_strong']}</strong>
     <span>{t['hint_span']}</span>
   </div>
-  <a class="btn btn-fire" href="{P}/apply.html">{t['hint_btn']}</a>
+  <a class="btn btn-fire" href="{P}/apply">{t['hint_btn']}</a>
 </aside>""",
         "OFFER": f"""
 <section class="block offer-block" id="bonus">
@@ -79,8 +79,8 @@ def blocks(lang):
     <div class="card"><div class="big">5%</div><h3>{t['c3_h']}</h3><p>{t['c3_p']}</p></div>
     <div class="card"><div class="big">{t['c4_big']}</div><h3>{t['c4_h']}</h3><p>{t['c4_p']}</p></div>
   </div>
-  <p class="fine">{t['offer_fine']} <a href="{P}/disclaimer.html">{t['terms']}</a>.</p>
-  <a class="btn btn-fire" href="{P}/apply.html">{t['offer_btn']}</a>
+  <p class="fine">{t['offer_fine']} <a href="{P}/disclaimer">{t['terms']}</a>.</p>
+  <a class="btn btn-fire" href="{P}/apply">{t['offer_btn']}</a>
 </section>""",
         "OPTIMIZER": f"""
 <section class="block optimizer-block" id="calculator">
@@ -134,13 +134,13 @@ def blocks(lang):
     <li><b>{t['st2_b']}</b><span>{t['st2_s']}</span></li>
     <li><b>{t['st3_b']}</b><span>{t['st3_s']}</span></li>
   </ol>
-  <a class="btn btn-fire" href="{P}/apply.html">{t['st_btn']}</a>
+  <a class="btn btn-fire" href="{P}/apply">{t['st_btn']}</a>
 </section>""",
         "CLOSE": f"""
 <section class="close-band">
   <h2>{t['cl_h2']}</h2>
   <p>{t['cl_p']}</p>
-  <a class="btn btn-fire" href="{P}/apply.html">{t['cl_btn']}</a>
+  <a class="btn btn-fire" href="{P}/apply">{t['cl_btn']}</a>
 </section>""",
         "VIDEOS": f"""
 <section class="block videos-block">
@@ -249,17 +249,17 @@ def footer(lang):
     return f"""
 <footer>
   <div class="wrap">
-    <nav class="foot-links"><a href="{P}/">{u['foot_home']}</a><a href="{P}/{HUB_SLUG[lang]}/">{u['foot_guides']}</a><a href="{P}/apply.html">{u['foot_claim']}</a><a href="{P}/disclaimer.html">{u['foot_disclaimer']}</a></nav>
+    <nav class="foot-links"><a href="{P}/">{u['foot_home']}</a><a href="{P}/{HUB_SLUG[lang]}/">{u['foot_guides']}</a><a href="{P}/apply">{u['foot_claim']}</a><a href="{P}/disclaimer">{u['foot_disclaimer']}</a></nav>
     <div class="contact-row">
       <span>{u['tg']}: <a data-tg>@RingoShitoitsu</a></span>
       <span>{u['phone']}: <a data-phone>906-235-5711</a></span>
       <span>{u['refcode']}: <strong style="color:var(--gold)">RINGO5</strong></span>
     </div>
-    <p style="margin:0">{u['foot_p']} <a href="{P}/disclaimer.html">{u['read_disclaimer']}</a>.</p>
+    <p style="margin:0">{u['foot_p']} <a href="{P}/disclaimer">{u['read_disclaimer']}</a>.</p>
   </div>
 </footer>
 
-<div class="sticky-cta"><a class="btn btn-fire btn-block" href="{P}/apply.html">{u['sticky']}</a></div>
+<div class="sticky-cta"><a class="btn btn-fire btn-block" href="{P}/apply">{u['sticky']}</a></div>
 
 <script src="/assets/js/config.js?v={VER}"></script>
 <script src="/assets/js/main.js?v={VER}"></script>
@@ -309,7 +309,7 @@ def build_page(lang, meta, pages, alts):
     <p class="lede">{meta['lede']}</p>
     <div class="byline">
       <img src="/assets/icons/icon.svg" alt="" width="36" height="36">
-      <div><b>{u['by']}</b> · {u['by_rest']}<br><span>{u['updated']} {upd} · {u['ambassador']} <a href="{P}/disclaimer.html">{u['foot_disclaimer']}</a></span></div>
+      <div><b>{u['by']}</b> · {u['by_rest']}<br><span>{u['updated']} {upd} · {u['ambassador']} <a href="{P}/disclaimer">{u['foot_disclaimer']}</a></span></div>
     </div>
     <div class="prose">
 {body}
@@ -392,7 +392,8 @@ def main():
         if key in ("apply", "signup", "verify"):
             continue  # funnel steps are noindex
         have = {l: p for l, p in paths.items() if l == "en" or (ROOT / p.strip("/")).exists()
-                or (ROOT / p.strip("/") / "index.html").exists()}
+                or (ROOT / p.strip("/") / "index.html").exists()
+                or (ROOT / (p.strip("/") + ".html")).exists()}
         pr = "1.0" if key == "home" else "0.3"
         for l, p in have.items():
             sitemap.append((p, pr, have))
