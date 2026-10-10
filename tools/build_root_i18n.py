@@ -225,7 +225,7 @@ def faq_ld(doc, lang):
     ld = [
         {"@context": "https://schema.org", "@type": "WebSite", "name": "RinGoMining", "url": f"{DOMAIN}{PREFIX[lang]}/", "inLanguage": lang},
         {"@context": "https://schema.org", "@type": "Person", "name": "Ringo", "alternateName": "RinGoMining", "url": f"{DOMAIN}/",
-         "sameAs": ["https://t.me/RingoShitoitsu"]},
+         "sameAs": ["https://t.me/RinGoMining"]},
     ]
     if qa:
         ld.append({"@context": "https://schema.org", "@type": "FAQPage", "inLanguage": lang, "mainEntity": [

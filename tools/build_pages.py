@@ -251,7 +251,7 @@ def footer(lang):
   <div class="wrap">
     <nav class="foot-links"><a href="{P}/">{u['foot_home']}</a><a href="{P}/{HUB_SLUG[lang]}/">{u['foot_guides']}</a><a href="{P}/apply">{u['foot_claim']}</a><a href="{P}/disclaimer">{u['foot_disclaimer']}</a></nav>
     <div class="contact-row">
-      <span>{u['tg']}: <a data-tg>@RingoShitoitsu</a></span>
+      <span>{u['tg']}: <a data-tg>@RinGoMining</a></span>
       <span>{u['phone']}: <a data-phone>906-235-5711</a></span>
       <span>{u['refcode']}: <strong style="color:var(--gold)">RINGO5</strong></span>
     </div>

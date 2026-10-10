@@ -11,7 +11,7 @@
 window.RINGO = {
   REF_CODE: "RINGO5",
   REF_LINK: "https://gomining.com/?ref=RINGO5",
-  TELEGRAM: "RingoShitoitsu",
+  TELEGRAM: "RinGoMining",
   PHONE: "906-235-5711",
 
   FORM_STEP1_URL: "https://docs.google.com/forms/d/e/1FAIpQLScOK7XSQGdnT_YSp_F5lWhD6iAQhEGl_h1CiCEVTOmNLYeGCQ/viewform?embedded=true",
