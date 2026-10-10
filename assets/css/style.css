@@ -332,3 +332,15 @@ footer a { color: var(--text); }
   .field-row { grid-template-columns: 1fr; }
   .native-form, .form-success { padding: 20px 16px; }
 }
+
+/* ---------- header nav + home guides ---------- */
+.bar-nav { display: flex; align-items: center; gap: 14px; }
+.bar-nav a { color: #d9cec2; text-decoration: none; font-weight: 600; font-size: 15px; }
+.bar-nav a:hover { color: var(--ember); }
+.home-guides { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
+.home-guides a { display: block; text-decoration: none; padding: 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); transition: border-color .15s, transform .15s; }
+.home-guides a:hover { border-color: var(--ember); transform: translateY(-2px); }
+.home-guides b { display: block; color: var(--text); font-size: 17px; margin-bottom: 4px; }
+.home-guides span { color: var(--muted); font-size: 14px; }
+@media (max-width: 900px) { .home-guides { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .home-guides { grid-template-columns: 1fr; } }

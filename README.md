@@ -47,3 +47,10 @@ Private page to track every lead (New → Reached out → Waiting on purchase �
 Data lives in the RinGoMining Leads sheet; tracking is saved to its **Tracker** tab.
 The backend is `tools/admin-backend.gs` (an Apps Script web app). The login is checked there,
 so no password is stored in this repo. Paste the web app URL into `ADMIN_API` in `assets/js/config.js`.
+
+## Guide pages (SEO)
+
+Source for the 8 guide pages lives in `tools/pages/*.html` (JSON front matter + body).
+Shared blocks (offer, calculator, live staking APR, videos, CTAs) are defined in `tools/build_pages.py`.
+After editing a page, run `python3 tools/build_pages.py` to regenerate `/<slug>/index.html`, `/guides/` and `sitemap.xml`.
+The staking APR updates itself from https://gmt-optimizer.com/api/rates.json via `rates.js`.
