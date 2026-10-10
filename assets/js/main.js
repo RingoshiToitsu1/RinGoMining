@@ -1,5 +1,12 @@
 (function () {
   var C = window.RINGO || {};
+  var T = {
+    en: { copied: "Copied ", fill: "Please fill in: ", sending: "Sending…", fail: "Couldn't send. Check your connection and try again, or message me on Telegram." },
+    fr: { copied: "Copié : ", fill: "Merci de remplir : ", sending: "Envoi…", fail: "Envoi impossible. Vérifiez votre connexion et réessayez, ou écrivez-moi sur Telegram." },
+    es: { copied: "Copiado: ", fill: "Completa: ", sending: "Enviando…", fail: "No se pudo enviar. Revisa tu conexión e inténtalo de nuevo, o escríbeme por Telegram." },
+    de: { copied: "Kopiert: ", fill: "Bitte ausfüllen: ", sending: "Wird gesendet…", fail: "Senden fehlgeschlagen. Prüfe deine Verbindung und versuch es nochmal, oder schreib mir auf Telegram." }
+  };
+  var L = T[(document.documentElement.lang || "en").slice(0, 2)] || T.en;
 
   function toast(msg) {
     var t = document.querySelector(".toast");
@@ -9,7 +16,7 @@
   }
 
   function copy(text) {
-    var done = function () { toast("Copied " + text); };
+    var done = function () { toast(L.copied + text); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done, fallback);
     } else { fallback(); }
@@ -55,7 +62,7 @@
         var bad = form.querySelector(":invalid");
         var f = bad && bad.closest(".field");
         var name = f ? (f.querySelector("label, .lbl").firstChild.textContent || "").trim() : "a field";
-        err.textContent = "Please fill in: " + name;
+        err.textContent = L.fill + name;
         err.hidden = false;
         if (bad) bad.focus();
         return;
@@ -65,7 +72,7 @@
         if (map[k] && String(v).trim()) data.append("entry." + map[k], String(v).trim());
       });
       var btn = form.querySelector("button[type=submit]");
-      var label = btn.textContent; btn.disabled = true; btn.textContent = "Sending…";
+      var label = btn.textContent; btn.disabled = true; btn.textContent = L.sending;
       fetch("https://docs.google.com/forms/d/e/" + id + "/formResponse", {
         method: "POST", mode: "no-cors", body: data
       }).then(function () {
@@ -75,7 +82,7 @@
         try { localStorage.setItem("ringo_" + key, "1"); } catch (x) {}
       }).catch(function () {
         btn.disabled = false; btn.textContent = label;
-        err.textContent = "Couldn't send. Check your connection and try again, or message me on Telegram.";
+        err.textContent = L.fail;
         err.hidden = false;
       });
     });

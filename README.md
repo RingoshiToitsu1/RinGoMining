@@ -54,3 +54,13 @@ Source for the 8 guide pages lives in `tools/pages/*.html` (JSON front matter + 
 Shared blocks (offer, calculator, live staking APR, videos, CTAs) are defined in `tools/build_pages.py`.
 After editing a page, run `python3 tools/build_pages.py` to regenerate `/<slug>/index.html`, `/guides/` and `sitemap.xml`.
 The staking APR updates itself from https://gmt-optimizer.com/api/rates.json via `rates.js`.
+
+## Languages (EN / FR / ES / DE)
+
+- Guides: translated sources in `tools/pages/<lang>/`, shared block text in `tools/i18n.py`. `python3 tools/build_pages.py`.
+- Homepage, signup steps and disclaimer: English is the source; translations live in `tools/i18n_root/<lang>.py`.
+  After editing an English root page, run `python3 tools/build_root_i18n.py --extract` to see new text, add it to each
+  language file, then `python3 tools/build_root_i18n.py` (it refuses to build if any translation is missing).
+- Form answers stay in English (`value="..."`) so the Google Forms and the admin tracker keep working.
+- `assets/js/lang.js` shows a "this site is available in your language" bar on English pages for FR/ES/DE browsers.
+- Preview images: `python3 tools/make_og_images.py <fonts dir>` writes `assets/img/og/<lang>/`.
