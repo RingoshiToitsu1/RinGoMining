@@ -24,7 +24,7 @@ Make two forms at forms.google.com, then paste each embed URL into `assets/js/co
 2. Phone number (short answer)
 3. Email (short answer, required, "Response validation: email")
 4. Telegram handle (short answer)
-5. How much are you planning to start with? (multiple choice: Just the first terahash / $100–$499 / $500–$999 / $1,000–$4,999 / $5,000–$10,000 / $10,000+)
+5. How much are you planning to start with? (multiple choice: Under $100 / $100–$499 / $500–$999 / $1,000–$4,999 / $5,000–$10,000 / $10,000+)
 6. How do you want your bonus paid? (multiple choice: USDC / Bitcoin / GoMining token)
 7. Best way to reach you? (multiple choice: Telegram / Text / Call / Email)
 8. Questions or concerns (paragraph)

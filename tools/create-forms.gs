@@ -45,7 +45,7 @@ function createRinGoForms() {
 
   f1.addMultipleChoiceItem().setTitle('How much are you planning to start with?')
     .setChoiceValues([
-      'Just the first terahash',
+      'Under $100',
       '$100 – $499',
       '$500 – $999',
       '$1,000 – $4,999',
