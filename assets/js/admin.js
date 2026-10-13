@@ -87,7 +87,7 @@
   function suggested(purchase) {
     var p = Number(purchase) || 0;
     if (!p) return 0;
-    return Math.round((Math.min(p, 10000) * 0.10 + 18.99) * 100) / 100;
+    return Math.round(Math.min(p, 10000) * 0.10 * 100) / 100;
   }
 
   // ---------- render ----------
@@ -207,7 +207,7 @@
   }
   function suggestText(p) {
     var s = suggested(p);
-    return s ? "Suggested bonus: " + money(s) + " (10% of up to $10,000 + $18.99 first terahash)" : "Enter their purchase to see the suggested bonus.";
+    return s ? "Suggested bonus: " + money(s) + " (10% of up to $10,000)" : "Enter their purchase to see the suggested bonus.";
   }
 
   // ---------- events ----------
