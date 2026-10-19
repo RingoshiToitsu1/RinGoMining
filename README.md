@@ -5,9 +5,8 @@ Referral funnel for Ringo's GoMining code **RINGO5**.
 | Page | Purpose |
 |---|---|
 | `index.html` | Landing page: story, SHIB proof, fire photos, GoMining vs cloud mining, GMT Optimizer, bonus offer, FAQ |
-| `apply.html` | Step 1: contact info (Google Form #1) |
-| `signup.html` | Step 2: create GoMining account with RINGO5 (opens in a new tab) |
-| `verify.html` | Step 3: GoMining ID + wallet details (Google Form #2) |
+| `apply.html` | The whole funnel on one page: 1) sign up with RINGO5, 2) buy terahash, 3) claim form (GoMining ID required, Google Form #2) |
+| `signup.html`, `verify.html` | Old step pages; they forward to `/apply` |
 | `disclaimer.html` | Not-financial-advice, risks, bonus terms |
 
 ## Go live (GitHub Pages)
@@ -40,6 +39,13 @@ Make two forms at forms.google.com, then paste each embed URL into `assets/js/co
 For each form: **Send → `< >` (embed) → copy the `src="…"` URL** and paste it into `FORM_STEP1_URL` / `FORM_STEP3_URL`. Turn on Settings → Responses → **Collect email addresses** off (we ask for it), and link both forms to one Google Sheet so you can match people by email.
 
 Until a URL is filled in, each step shows a Telegram/phone fallback so nobody gets stuck.
+
+## Claim emails (`tools/claim-notify.gs`)
+
+Sends each claimer an instant confirmation email in their language and emails you an alert with their GoMining ID and wallet.
+Setup steps are at the top of the file (runs in the same Apps Script project as the forms).
+
+Form #1 below is no longer on the site; older leads from it still show in the admin tracker.
 
 ## Admin lead tracker (`admin.html`)
 

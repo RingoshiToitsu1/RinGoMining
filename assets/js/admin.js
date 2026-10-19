@@ -132,8 +132,9 @@
   function card(l) {
     var s1 = l.step1 || {}, s3 = l.step3 || {}, t = l.track || {}, st = statusOf(l), key = esc(l.email);
     var badges = [];
-    badges.push(l.step1 ? '<span class="badge ok">Step 1</span>' : '<span class="badge bad">No Step 1</span>');
-    badges.push(l.step3 ? '<span class="badge ok">ID sent</span>' : '<span class="badge warn">No ID yet</span>');
+    // new funnel: one claim form (GoMining ID required). Step 1 only exists on older leads.
+    if (l.step1) badges.push('<span class="badge">Old Step 1</span>');
+    badges.push(l.step3 ? '<span class="badge ok">Claim · ID sent</span>' : '<span class="badge warn">No ID yet</span>');
     if (s1.amount) badges.push('<span class="badge">' + esc(s1.amount) + "</span>");
     if (isDue(l)) badges.push('<span class="badge bad">Pay now · confirmed ' + esc(ago(t.confirmed_at)) + "</span>");
 
@@ -158,13 +159,12 @@
         "<div>" +
           "<h4>Contact" + (s1.contact ? " · prefers " + esc(s1.contact) : "") + "</h4>" +
           '<div class="contact-btns">' + contacts.join("") + "</div>" +
-          "<h4>Step 1</h4>" +
-          (l.step1 ? '<dl class="kv">' +
+          (l.step1 ? "<h4>Step 1 (old form)</h4>" + '<dl class="kv">' +
             kv("Name", s1.name) + kv("Phone", s1.phone) + kv("Telegram", s1.telegram) +
             kv("Plans to start", s1.amount) + kv("Bonus coin", s1.coin) + kv("Submitted", fmt(s1.at)) + "</dl>" +
             (s1.questions ? '<p class="quote">' + esc(s1.questions) + "</p>" : "")
-            : '<p class="muted">Didn\'t fill out Step 1.</p>') +
-          "<h4>Step 3 · payout details</h4>" +
+            : "") +
+          "<h4>Claim · payout details</h4>" +
           (l.step3 ? '<dl class="kv">' +
             kv("GoMining ID", s3.gmid, true) + kv("Coin", s3.coin) + kv("Chain", s3.chain) +
             kv("Wallet", s3.wallet, true) + kv("Submitted", fmt(s3.at)) + "</dl>" +

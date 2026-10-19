@@ -6,7 +6,12 @@
     es: { copied: "Copiado: ", fill: "Completa: ", sending: "Enviando…", fail: "No se pudo enviar. Revisa tu conexión e inténtalo de nuevo, o escríbeme por Telegram." },
     de: { copied: "Kopiert: ", fill: "Bitte ausfüllen: ", sending: "Wird gesendet…", fail: "Senden fehlgeschlagen. Prüfe deine Verbindung und versuch es nochmal, oder schreib mir auf Telegram." }
   };
-  var L = T[(document.documentElement.lang || "en").slice(0, 2)] || T.en;
+  var LANG = (document.documentElement.lang || "en").slice(0, 2);
+  var L = T[LANG] || T.en;
+
+  // old funnel steps (/signup, /verify) forward to the one-page claim flow
+  var go = document.querySelector("[data-redirect]");
+  if (go) { location.replace(go.href); return; }
 
   function toast(msg) {
     var t = document.querySelector(".toast");
@@ -67,9 +72,13 @@
         if (bad) bad.focus();
         return;
       }
+      var vals = {};
+      new FormData(form).forEach(function (v, k) { vals[k] = String(v).trim(); });
+      // tag non-English claims so the reply goes out in their language
+      if (map.notes && LANG !== "en") vals.notes = (vals.notes ? vals.notes + "\n" : "") + "Language: " + LANG.toUpperCase();
       var data = new URLSearchParams();
-      new FormData(form).forEach(function (v, k) {
-        if (map[k] && String(v).trim()) data.append("entry." + map[k], String(v).trim());
+      Object.keys(vals).forEach(function (k) {
+        if (map[k] && vals[k]) data.append("entry." + map[k], vals[k]);
       });
       var btn = form.querySelector("button[type=submit]");
       var label = btn.textContent; btn.disabled = true; btn.textContent = L.sending;
