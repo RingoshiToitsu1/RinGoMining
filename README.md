@@ -31,9 +31,9 @@ Make two forms at forms.google.com, then paste each embed URL into `assets/js/co
 **Form 2: "RinGoMining · Step 3: Confirm & get paid"**
 1. Email you used in Step 1 (short answer, required)
 2. GoMining ID (short answer, required, "Response validation: number")
-3. Payout coin (multiple choice: USDC / Bitcoin / GoMining token, required)
-4. Chain / network (short answer, required, e.g. Ethereum, BNB Chain, Bitcoin, Solana)
-5. Wallet address (short answer, required)
+3. Payout coin (multiple choice; the site always sends "GoMining token (GMT)")
+4. Chain / network (short answer; the site always sends "BNB Smart Chain (BEP-20)")
+5. Wallet address (short answer, required; the GoMining BSC deposit address)
 6. Anything else I should know? (paragraph)
 
 For each form: **Send → `< >` (embed) → copy the `src="…"` URL** and paste it into `FORM_STEP1_URL` / `FORM_STEP3_URL`. Turn on Settings → Responses → **Collect email addresses** off (we ask for it), and link both forms to one Google Sheet so you can match people by email.

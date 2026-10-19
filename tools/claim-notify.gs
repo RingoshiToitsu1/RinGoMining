@@ -36,8 +36,8 @@ function installClaimEmails() {
 
 function testClaimEmails() {
   var me = Session.getEffectiveUser().getEmail();
-  var claim = { email: me, gmid: '3566334', coin: 'USDC', chain: 'BNB Chain',
-                wallet: '0xTEST', notes: '@yourname\nLanguage: EN' };
+  var claim = { email: me, gmid: '3566334', coin: 'GoMining token (GMT)', chain: 'BNB Smart Chain (BEP-20)',
+                wallet: '0x0000000000000000000000000000000000000000', notes: '@yourname\nLanguage: EN' };
   sendCustomerEmail_(claim);
   sendOwnerAlert_(claim);
   Logger.log('Sent two test emails to ' + me);

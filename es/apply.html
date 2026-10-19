@@ -29,14 +29,14 @@
   <meta property="og:locale" content="es_ES">
   <!--/i18n-->
   <meta name="theme-color" content="#0b0907">
-  <link rel="icon" href="/favicon.ico?v=202610191705" sizes="32x32">
-  <link rel="icon" href="/assets/icons/icon.svg?v=202610191705" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico?v=202610191713" sizes="32x32">
+  <link rel="icon" href="/assets/icons/icon.svg?v=202610191713" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
   <link rel="manifest" href="/site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Outfit:wght@600;700&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/style.css?v=202610191705">
+  <link rel="stylesheet" href="/assets/css/style.css?v=202610191713">
 </head>
 <body>
 <header class="bar">
@@ -69,9 +69,10 @@
 
     <section class="claim-step" id="claim">
       <h2><span>3</span>Reclama tu bono</h2>
-      <p>Envíame tu ID de GoMining y dónde quieres cobrar. Lo reviso en mi lista de referidos y te pago el bono dentro de las 24 horas tras confirmarlo.</p>
+      <p>Envíame tu ID de GoMining y tu dirección de depósito BSC de GoMining. Reviso tu ID en mi lista de referidos y te envío el bono en tokens GOMINING en BNB Smart Chain, directo a tu cuenta de GoMining, dentro de las 24 horas tras confirmarlo.</p>
       <p><strong>Cómo encontrar tu ID de GoMining:</strong> toca tu foto de perfil (arriba a la derecha) en GoMining. Tu ID es el número justo debajo de tu nombre.</p>
       <img width="600" height="160" class="id-shot" src="/assets/img/find-your-id.png" alt="Tarjeta de perfil de GoMining con el ID resaltado debajo del nombre">
+      <p><strong>Cómo encontrar tu dirección de depósito BSC:</strong> en GoMining, abre tu billetera (Wallet), toca Depositar (Deposit), elige GOMINING y la red BNB Smart Chain (BEP-20), y copia la dirección. Empieza por 0x.</p>
     </section>
 
     <form class="native-form" data-native="STEP3" hidden novalidate>
@@ -79,9 +80,9 @@
         <div class="field"><label for="g-email">Correo</label><input id="g-email" name="email" type="email" autocomplete="email" required></div>
         <div class="field"><label for="g-id">ID de GoMining <em>(solo números)</em></label><input id="g-id" name="gmid" inputmode="numeric" pattern="[0-9]+" placeholder="ej. 3566334" required></div>
       </div>
-      <div class="field"><span class="lbl">Pagar mi bono en</span><div class="chips"><label><input type="radio" name="coin" value="USDC" required><span>USDC</span></label><label><input type="radio" name="coin" value="Bitcoin"><span>Bitcoin</span></label><label><input type="radio" name="coin" value="GoMining token (GMT)"><span>Token GoMining (GMT)</span></label></div></div>
-      <div class="field"><label for="g-chain">Red (chain)</label><input id="g-chain" name="chain" placeholder="Ethereum, BNB Chain, Polygon, Solana, Bitcoin…" required></div>
-      <div class="field"><label for="g-wallet">Dirección de la billetera <em>(revísala, un error no se puede deshacer)</em></label><input id="g-wallet" name="wallet" autocomplete="off" spellcheck="false" required></div>
+      <input type="hidden" name="coin" value="GoMining token (GMT)">
+      <input type="hidden" name="chain" value="BNB Smart Chain (BEP-20)">
+      <div class="field"><label for="g-wallet">Dirección de depósito BSC de GoMining <em>(empieza por 0x)</em></label><input id="g-wallet" name="wallet" autocomplete="off" spellcheck="false" pattern="\s*0x[0-9a-fA-F]{40}\s*" placeholder="0x…" required></div>
       <div class="field"><label for="g-notes">Usuario de Telegram o preguntas <em>(opcional)</em></label><textarea id="g-notes" name="notes" rows="3" placeholder="@yourname"></textarea></div>
       <p class="form-error" hidden></p>
       <button class="btn btn-fire btn-block" type="submit">Reclamar mi bono →</button>
@@ -94,7 +95,7 @@
     </div>
     <div data-form="STEP3" class="form-missing">
         <p><strong>El formulario tarda en cargar o aún no está conectado.</strong></p>
-        <p>Sin problema. Escríbeme por Telegram a <a data-tg href="https://t.me/RinGoMining" target="_blank" rel="noopener">@RinGoMining</a> o llama/manda un SMS al <a data-phone>906-235-5711</a> con tu ID de GoMining, la moneda de pago, la red y la dirección de tu billetera, y lo hago yo a mano.</p>
+        <p>No pasa nada. Escríbeme por Telegram a <a data-tg href="https://t.me/RinGoMining" target="_blank" rel="noopener">@RinGoMining</a> o llama/envía un SMS al <a data-phone>906-235-5711</a> con tu ID de GoMining y tu dirección de depósito BSC de GoMining, y te ayudo a mano.</p>
       </div>
 
     <div class="nav-row">
@@ -113,8 +114,8 @@
     <p style="margin:0">Embajador independiente de GoMining. No es asesoramiento financiero. <a href="/es/disclaimer">Aviso legal completo</a>.</p>
   </div>
 </footer>
-<script src="/assets/js/config.js?v=202610191705"></script>
-<script src="/assets/js/main.js?v=202610191705"></script>
+<script src="/assets/js/config.js?v=202610191713"></script>
+<script src="/assets/js/main.js?v=202610191713"></script>
 <script src="/assets/js/lang.js"></script>
 </body>
 </html>

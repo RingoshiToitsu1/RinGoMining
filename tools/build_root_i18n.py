@@ -31,7 +31,7 @@ ROOT_KEY = {"index.html": "/", "apply.html": "/apply", "signup.html": "/signup",
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 ATTRS = ("alt", "placeholder", "title", "aria-label")
 KEEP = {"RINGOMINING", "CODE: RINGO5 ⧉", "Ethereum · Uniswap V2", "150B SHIB", "292.54 ETH", "ringoshi.eth",
-        "0xfc688c…13e6c2", "GoMining", "GMT Optimizer", "USDC", "Bitcoin", "Telegram", "RINGO5", "@yourname"}
+        "0xfc688c…13e6c2", "GoMining", "GMT Optimizer", "USDC", "Bitcoin", "Telegram", "RINGO5", "@yourname", "0x…"}
 META_TR = re.compile(r'(<meta\s+(?:name|property)="(?:description|og:title|og:description|og:image:alt|twitter:title|twitter:description)"\s+content=")([^"]*)(")')
 TOKEN = re.compile(r"<!--.*?-->|<(/?)([a-zA-Z0-9]+)([^>]*)>|([^<]+)", re.S)
 

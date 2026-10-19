@@ -263,6 +263,7 @@ footer a { color: var(--text); }
 .claim-step p { color: #cfc3b6; font-size: 15px; margin: 0 0 14px; }
 .claim-step p:last-child { margin-bottom: 0; }
 .claim-step .codebox { margin-bottom: 12px; }
+.claim-step .id-shot { margin-bottom: 14px; }
 .claim-step .claim-fine { font-size: 14px; margin: 14px 0 0; }
 .side-door { margin: 0 0 18px; }
 .id-shot { border-radius: 12px; border: 1px solid var(--line); margin: 12px 0 0; width: 100%; max-width: 360px; }
