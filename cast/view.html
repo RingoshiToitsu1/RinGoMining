@@ -25,6 +25,7 @@
 </head>
 <body>
 <video id="v" autoplay playsinline muted></video>
+<div id="dbg" hidden style="position:fixed;left:12px;top:12px;z-index:6;padding:8px 12px;border-radius:8px;background:rgba(0,0,0,.75);color:#fff;font:600 16px/1.4 ui-monospace,Menlo,monospace"></div>
 <button id="unmute" hidden style="position:fixed;right:16px;bottom:16px;z-index:5;padding:12px 16px;border:0;border-radius:10px;background:#f0803c;color:#1e1915;font:700 15px/1 inherit;cursor:pointer">Click to hear audio</button>
 <div class="card" id="card">
   <h1>RINGO<span>CAST</span> · OBS viewer</h1>
@@ -119,6 +120,16 @@
     });
   }
 
+  const dbg = $('dbg'), debug = params.has('debug');
+  if (debug) {
+    dbg.hidden = false;
+    setInterval(() => {
+      const so = video.srcObject, at = so ? so.getAudioTracks() : [];
+      dbg.textContent = 'phone audio: ' + (so ? (at.length ? at.length + ' track ' + (at[0].muted ? '(silent from phone)' : at[0].readyState) : 'NONE sent') : 'not connected')
+        + ' | player: ' + (video.muted ? 'MUTED (autoplay blocked)' : 'unmuted') + ' vol ' + video.volume
+        + ' | ' + (window.obsstudio ? 'in OBS' : 'in browser');
+    }, 500);
+  }
   unmuteBtn.addEventListener('click', () => { video.muted = false; video.play(); unmuteBtn.hidden = true; });
   showIdle();
   start();
