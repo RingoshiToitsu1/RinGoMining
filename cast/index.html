@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ringo Cast</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0907">
+<link rel="icon" href="../favicon.ico">
+<style>
+  :root{--bg:#0b0907;--card:#16130f;--line:#2a241d;--text:#f2ebe3;--muted:#a89a8b;--orange:#f0803c;--red:#e5534b;--green:#4cc38a}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  main{max-width:440px;margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 16px 32px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.02em}
+  h1 span{color:var(--orange)}
+  p.sub{margin:0 0 22px;color:var(--muted)}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;text-transform:uppercase;letter-spacing:.08em}
+  input{width:100%;padding:14px;font:600 22px/1 ui-monospace,Menlo,monospace;letter-spacing:.15em;text-transform:uppercase;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px}
+  input:focus{outline:2px solid var(--orange);border-color:transparent}
+  button{width:100%;margin-top:14px;padding:16px;font-family:inherit;font-weight:700;font-size:17px;line-height:1;border:0;border-radius:10px;cursor:pointer}
+  #go{background:var(--orange);color:#1e1915}
+  #stop{background:var(--card);color:var(--text);border:1px solid var(--line)}
+  button:disabled{opacity:.5}
+  .status{margin-top:18px;padding:12px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+  .live .dot{background:var(--green);box-shadow:0 0 0 4px rgba(76,195,138,.2)}
+  .err .dot{background:var(--red)}
+  video{width:100%;margin-top:16px;border-radius:10px;background:#000;display:none}
+  .tips{margin-top:22px;color:var(--muted);font-size:14px}
+  .tips li{margin-bottom:6px}
+  .row{display:flex;gap:10px}
+  .row label{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:15px;color:var(--text);margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>RINGO<span>CAST</span></h1>
+  <p class="sub">Send this phone's screen to OBS over Wi-Fi.</p>
+
+  <label for="room">Room code (shown in OBS)</label>
+  <input id="room" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
+
+  <div class="row">
+    <label><input type="checkbox" id="audio" style="width:auto"> Include audio</label>
+  </div>
+
+  <button id="go">Start sharing</button>
+  <button id="stop" hidden>Stop</button>
+
+  <div class="status" id="statusBox"><span class="dot"></span><span id="status">Not connected</span></div>
+  <video id="preview" muted playsinline autoplay></video>
+
+  <ul class="tips">
+    <li>Open the viewer link in OBS first, then tap Start here.</li>
+    <li>Keep the phone and computer on the same Wi-Fi for the best quality.</li>
+    <li>Turn on Do Not Disturb so notifications don't end up in your video.</li>
+  </ul>
+</main>
+
+<script src="lib/peerjs.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), box = $('statusBox'), statusEl = $('status'), preview = $('preview'), audioEl = $('audio');
+  const PREFIX = 'ringocast-';
+  let peer = null, call = null, stream = null;
+
+  const params = new URLSearchParams(location.search);
+  let saved = ''; try { saved = localStorage.getItem('ringocast-room') || ''; } catch (e) {}
+  roomEl.value = (params.get('room') || saved).toUpperCase();
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text;
+    box.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  if (!supported) {
+    goBtn.disabled = true;
+    setStatus("This browser can't share its screen. On iPhone, use Safari on iOS 27 or later.", 'err');
+  }
+
+  function cleanup(msg, kind) {
+    if (call) { try { call.close(); } catch (e) {} call = null; }
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    preview.srcObject = null; preview.style.display = 'none';
+    goBtn.hidden = false; goBtn.disabled = !supported; stopBtn.hidden = true;
+    setStatus(msg || 'Stopped', kind);
+  }
+
+  async function boostBitrate(pc) {
+    for (const s of pc.getSenders()) {
+      if (!s.track || s.track.kind !== 'video') continue;
+      try {
+        const p = s.getParameters();
+        if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+        p.encodings[0].maxBitrate = 8000000;
+        p.degradationPreference = 'maintain-resolution';
+        await s.setParameters(p);
+      } catch (e) {}
+    }
+  }
+
+  goBtn.addEventListener('click', async () => {
+    const room = roomEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!room) { setStatus('Type the room code from OBS first.', 'err'); roomEl.focus(); return; }
+    try { localStorage.setItem('ringocast-room', room); } catch (e) {}
+    goBtn.disabled = true;
+    setStatus('Pick what to share…');
+
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30 } },
+        audio: audioEl.checked
+      });
+    } catch (e) {
+      cleanup(e && e.name === 'NotAllowedError' ? 'Sharing was cancelled.' : 'Could not start screen sharing: ' + (e && e.message || e), 'err');
+      return;
+    }
+
+    preview.srcObject = stream; preview.style.display = 'block';
+    stream.getVideoTracks()[0].addEventListener('ended', () => cleanup('Screen sharing ended.'));
+    goBtn.hidden = true; stopBtn.hidden = false;
+    setStatus('Connecting to OBS…');
+
+    peer = new Peer({ debug: 1 });
+    peer.on('open', () => {
+      call = peer.call(PREFIX + room, stream);
+      if (!call) { cleanup('Could not reach OBS. Check the room code.', 'err'); return; }
+      call.on('stream', () => {});
+      const pc = call.peerConnection;
+      if (pc) {
+        pc.addEventListener('connectionstatechange', () => {
+          const st = pc.connectionState;
+          if (st === 'connected') { setStatus('Live in OBS · room ' + room, 'live'); boostBitrate(pc); }
+          else if (st === 'failed') cleanup('Connection to OBS failed. Same Wi-Fi?', 'err');
+          else if (st === 'disconnected') setStatus('Connection dropped, retrying…');
+        });
+      }
+      call.on('close', () => { if (stream) cleanup('OBS closed the connection.'); });
+      call.on('error', e => cleanup('Error: ' + e.message, 'err'));
+      setTimeout(() => {
+        if (call && call.peerConnection && call.peerConnection.connectionState !== 'connected' && stream)
+          setStatus('Still waiting for OBS… is the viewer open with room ' + room + '?');
+      }, 8000);
+    });
+    peer.on('error', e => {
+      if (e.type === 'peer-unavailable') cleanup('OBS viewer not found for room ' + room + '. Open the viewer first.', 'err');
+      else cleanup('Error: ' + (e.message || e.type), 'err');
+    });
+  });
+
+  stopBtn.addEventListener('click', () => cleanup('Stopped'));
+})();
+</script>
+</body>
+</html>

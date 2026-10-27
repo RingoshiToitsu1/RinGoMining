@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ringo Cast Viewer</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../favicon.ico">
+<style>
+  :root{--card:#16130f;--line:#2a241d;--text:#f2ebe3;--muted:#a89a8b;--orange:#f0803c;--red:#e5534b}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:transparent;color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  body.page{background:#0b0907}
+  video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;display:none}
+  .card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:.02em} h1 span{color:var(--orange)}
+  .code{font:700 44px/1.1 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:var(--orange);margin:10px 0 6px}
+  .muted{color:var(--muted);font-size:14px;margin:0}
+  #qr{background:#fff;border-radius:10px;padding:10px;display:inline-block;margin:16px 0 10px;line-height:0}
+  #qr img{width:180px;height:180px;image-rendering:pixelated}
+  .url{font:12px ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all;margin:8px 0 0}
+  .state{margin-top:14px;font-size:14px}
+  .err{color:var(--red)}
+</style>
+</head>
+<body>
+<video id="v" autoplay playsinline muted></video>
+<div class="card" id="card">
+  <h1>RINGO<span>CAST</span> · OBS viewer</h1>
+  <div class="code" id="code">······</div>
+  <p class="muted">Scan with your phone, or open <b>ringomining.com/cast</b> and type the code.</p>
+  <div id="qr"></div>
+  <p class="muted">Add this exact URL as an OBS Browser Source:</p>
+  <p class="url" id="obsUrl"></p>
+  <p class="state" id="state">Starting…</p>
+</div>
+
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/qrcode.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const video = $('v'), card = $('card'), stateEl = $('state');
+  const PREFIX = 'ringocast-';
+  const params = new URLSearchParams(location.search);
+  const clean = params.has('clean');
+  const inOBS = !!window.obsstudio;
+  if (!inOBS) document.body.classList.add('page');
+
+  let room = (params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!room) {
+    const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    room = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => abc[b % abc.length]).join('');
+    params.set('room', room);
+    history.replaceState(null, '', location.pathname + '?' + params.toString());
+  }
+
+  const base = location.origin + location.pathname.replace(/view\.html$/, '');
+  const senderUrl = base + '?room=' + room;
+  $('code').textContent = room;
+  $('obsUrl').textContent = location.origin + location.pathname + '?room=' + room;
+  try {
+    const qr = qrcode(0, 'M'); qr.addData(senderUrl); qr.make();
+    $('qr').innerHTML = qr.createImgTag(6, 0);
+  } catch (e) { $('qr').style.display = 'none'; }
+
+  function setState(t, bad) { stateEl.textContent = t; stateEl.className = 'state' + (bad ? ' err' : ''); }
+  function showIdle() {
+    video.style.display = 'none'; video.srcObject = null;
+    card.style.display = clean ? 'none' : 'block';
+  }
+  function showLive() { card.style.display = 'none'; video.style.display = 'block'; }
+
+  let peer = null, current = null, retryTimer = null, idTaken = false;
+
+  function start() {
+    idTaken = false;
+    peer = new Peer(PREFIX + room, { debug: 1 });
+    peer.on('open', () => setState('Waiting for your phone…'));
+    peer.on('call', call => {
+      if (current) { try { current.close(); } catch (e) {} }
+      current = call;
+      call.answer();
+      call.on('stream', s => {
+        video.srcObject = s;
+        video.muted = false;
+        video.play().catch(() => { video.muted = true; video.play(); });
+        showLive();
+      });
+      const done = () => { if (current === call) { current = null; showIdle(); setState('Phone disconnected. Waiting for your phone…'); } };
+      call.on('close', done);
+      call.on('error', done);
+      if (call.peerConnection) call.peerConnection.addEventListener('connectionstatechange', () => {
+        if (['failed', 'closed'].includes(call.peerConnection.connectionState)) done();
+      });
+    });
+    peer.on('disconnected', () => { if (idTaken || peer.destroyed) return; setState('Reconnecting…'); try { peer.reconnect(); } catch (e) {} });
+    peer.on('error', e => {
+      if (e.type === 'unavailable-id') {
+        idTaken = true;
+        setState('Room ' + room + ' is already open somewhere else (another OBS source or browser tab). Close it, or use a different room.', true);
+        card.style.display = 'block';
+        clearTimeout(retryTimer); retryTimer = setTimeout(() => { try { peer.destroy(); } catch (x) {} start(); }, 10000);
+      } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) {
+        setState('Lost the connection server, retrying…', true);
+        clearTimeout(retryTimer); retryTimer = setTimeout(() => { try { peer.destroy(); } catch (x) {} start(); }, 5000);
+      } else {
+        setState('Error: ' + (e.message || e.type), true);
+      }
+    });
+  }
+
+  showIdle();
+  start();
+})();
+</script>
+</body>
+</html>
