@@ -51,6 +51,8 @@
   <div class="status" id="statusBox"><span class="dot"></span><span id="status">Not connected</span></div>
   <video id="preview" muted playsinline autoplay></video>
 
+  <pre id="log" style="margin-top:16px;padding:10px 12px;background:#000;border:1px solid var(--line);border-radius:10px;color:var(--muted);font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:180px;overflow:auto"></pre>
+
   <ul class="tips">
     <li>Open the viewer link in OBS first, then tap Start here.</li>
     <li>Keep the phone and computer on the same Wi-Fi for the best quality.</li>
@@ -82,6 +84,7 @@
   }
 
   function cleanup(msg, kind) {
+    clearTimeout(retryTimer);
     if (call) { try { call.close(); } catch (e) {} call = null; }
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
@@ -103,56 +106,95 @@
     }
   }
 
+  const logEl = $('log');
+  function log(msg) {
+    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    logEl.textContent = (t + '  ' + msg + '\n' + logEl.textContent).slice(0, 4000);
+  }
+  window.addEventListener('error', e => log('page error: ' + e.message));
+
+  let room = '', retryTimer = null, connected = false;
+
+  function scheduleRetry(why) {
+    if (!stream) return;
+    connected = false;
+    setStatus(why + ' Retrying…', 'err');
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(connect, 3000);
+  }
+
+  function ensurePeer() {
+    if (peer && !peer.destroyed && !peer.disconnected) return Promise.resolve(peer);
+    if (peer && peer.disconnected && !peer.destroyed) { log('signal: reconnecting'); try { peer.reconnect(); } catch (e) {} }
+    else {
+      peer = new Peer({ debug: 1 });
+      peer.on('error', e => {
+        log('signal error: ' + e.type + (e.message ? ' (' + e.message + ')' : ''));
+        if (e.type === 'peer-unavailable') scheduleRetry('OBS viewer not found for room ' + room + '. Is it open in OBS?');
+        else scheduleRetry('Connection error.');
+      });
+      peer.on('disconnected', () => log('signal: disconnected'));
+    }
+    return new Promise((res, rej) => {
+      if (peer.open) return res(peer);
+      const to = setTimeout(() => rej(new Error('signal server timeout')), 10000);
+      peer.once('open', () => { clearTimeout(to); log('signal: connected'); res(peer); });
+    });
+  }
+
+  async function connect() {
+    if (!stream) return;
+    setStatus('Connecting to OBS…');
+    try { await ensurePeer(); } catch (e) { log(e.message); return scheduleRetry("Can't reach the connection server."); }
+    if (!stream) return;
+    if (call) { try { call.close(); } catch (e) {} call = null; }
+    log('calling room ' + room);
+    const c = peer.call(PREFIX + room, stream);
+    if (!c) return scheduleRetry('Could not call OBS.');
+    call = c;
+    const pc = c.peerConnection;
+    if (pc) pc.addEventListener('connectionstatechange', () => {
+      if (call !== c) return;
+      const st = pc.connectionState; log('link: ' + st);
+      if (st === 'connected') { connected = true; setStatus('Live in OBS · room ' + room, 'live'); boostBitrate(pc); }
+      else if (st === 'failed') scheduleRetry('Connection to OBS failed.');
+      else if (st === 'disconnected') {
+        setStatus('Connection dropped, waiting…');
+        setTimeout(() => { if (call === c && pc.connectionState !== 'connected') scheduleRetry('Lost OBS.'); }, 4000);
+      }
+    });
+    c.on('close', () => { if (call === c && stream) { log('link: closed by OBS'); scheduleRetry('OBS closed the connection.'); } });
+    c.on('error', e => { if (call === c) { log('call error: ' + e.message); scheduleRetry('Connection error.'); } });
+  }
+
   goBtn.addEventListener('click', async () => {
-    const room = roomEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    room = roomEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!room) { setStatus('Type the room code from OBS first.', 'err'); roomEl.focus(); return; }
     try { localStorage.setItem('ringocast-room', room); } catch (e) {}
     goBtn.disabled = true;
     setStatus('Pick what to share…');
 
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 30 } },
-        audio: audioEl.checked
-      });
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioEl.checked });
     } catch (e) {
+      log('capture failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
       cleanup(e && e.name === 'NotAllowedError' ? 'Sharing was cancelled.' : 'Could not start screen sharing: ' + (e && e.message || e), 'err');
       return;
     }
 
+    const vt = stream.getVideoTracks()[0];
+    log('capture started: ' + (vt ? vt.label || 'video' : 'no video track') + ' ' + JSON.stringify(vt && vt.getSettings ? (({width,height,frameRate}) => ({width,height,frameRate}))(vt.getSettings()) : {}));
+    stream.getTracks().forEach(t => {
+      t.addEventListener('ended', () => { log(t.kind + ' track ended by the phone'); if (t.kind === 'video') cleanup('iPhone ended the screen share.', 'err'); });
+      t.addEventListener('mute', () => log(t.kind + ' track paused by the phone'));
+      t.addEventListener('unmute', () => log(t.kind + ' track resumed'));
+    });
     preview.srcObject = stream; preview.style.display = 'block';
-    stream.getVideoTracks()[0].addEventListener('ended', () => cleanup('Screen sharing ended.'));
     goBtn.hidden = true; stopBtn.hidden = false;
-    setStatus('Connecting to OBS…');
-
-    peer = new Peer({ debug: 1 });
-    peer.on('open', () => {
-      call = peer.call(PREFIX + room, stream);
-      if (!call) { cleanup('Could not reach OBS. Check the room code.', 'err'); return; }
-      call.on('stream', () => {});
-      const pc = call.peerConnection;
-      if (pc) {
-        pc.addEventListener('connectionstatechange', () => {
-          const st = pc.connectionState;
-          if (st === 'connected') { setStatus('Live in OBS · room ' + room, 'live'); boostBitrate(pc); }
-          else if (st === 'failed') cleanup('Connection to OBS failed. Same Wi-Fi?', 'err');
-          else if (st === 'disconnected') setStatus('Connection dropped, retrying…');
-        });
-      }
-      call.on('close', () => { if (stream) cleanup('OBS closed the connection.'); });
-      call.on('error', e => cleanup('Error: ' + e.message, 'err'));
-      setTimeout(() => {
-        if (call && call.peerConnection && call.peerConnection.connectionState !== 'connected' && stream)
-          setStatus('Still waiting for OBS… is the viewer open with room ' + room + '?');
-      }, 8000);
-    });
-    peer.on('error', e => {
-      if (e.type === 'peer-unavailable') cleanup('OBS viewer not found for room ' + room + '. Open the viewer first.', 'err');
-      else cleanup('Error: ' + (e.message || e.type), 'err');
-    });
+    connect();
   });
 
-  stopBtn.addEventListener('click', () => cleanup('Stopped'));
+  stopBtn.addEventListener('click', () => { log('stopped by you'); cleanup('Stopped'); });
 })();
 </script>
 </body>
