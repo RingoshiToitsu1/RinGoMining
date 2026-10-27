@@ -4,10 +4,12 @@
 # outfit) in FONTS, and Playwright with Chromium.
 import asyncio
 import sys
+from pathlib import Path
 from playwright.async_api import async_playwright
 
 FONTS = sys.argv[1] if len(sys.argv) > 1 else "/tmp/claude-0/fonts"
-R = "/home/claude/ringomining"
+R = str(Path(__file__).resolve().parent.parent)
+ONLY = set(sys.argv[2].split(",")) if len(sys.argv) > 2 else None  # e.g. "en/home,fr/home"
 
 BG = {
     "home": "fire-racks-wide.jpg", "gomining-promo-code": "fire-racks-wide.jpg", "is-gomining-legit": "fire-container.jpg",
@@ -19,7 +21,9 @@ BG = {
 # (headline with <em> highlights, [chip, chip])
 TEXT = {
     "en": {
-        "gomining-promo-code": ("GoMining promo code: <em>RINGO5</em>", ["5% bonus terahash", "10% back"]),
+        # en/home.jpg is copied to assets/img/og-image.jpg (the English root pages use that path)
+        "home": ("I made <em>$1M</em> on a meme coin. Then I watched my miners <em>burn.</em>", ["5% bonus terahash", "VIP Platinum+"]),
+        "gomining-promo-code": ("GoMining promo code: <em>RINGO5</em>", ["5% bonus terahash", "VIP Platinum+"]),
         "is-gomining-legit": ("Is GoMining <em>legit?</em> What I checked", ["Real farms on video", "10+ yrs in crypto"]),
         "gomining-review": ("My GoMining review: <em>$33,733</em> mined in 17 months", ["Real screenshots", "Gross vs net"]),
         "is-gomining-profitable": ("Is GoMining <em>profitable</em> in 2026?", ["Real net numbers", "Live staking APR"]),
@@ -30,8 +34,8 @@ TEXT = {
         "guides": ("Everything I'd tell you about <em>GoMining</em>", ["8 straight-answer guides", "Real numbers"]),
     },
     "fr": {
-        "home": ("J'ai gagné <em>1 M$</em> avec un meme coin. Puis j'ai vu mes machines <em>brûler.</em>", ["5 % de térahash bonus", "10 % remboursés"]),
-        "gomining-promo-code": ("Code promo GoMining : <em>RINGO5</em>", ["5 % de térahash bonus", "10 % remboursés"]),
+        "home": ("J'ai gagné <em>1 M$</em> avec un meme coin. Puis j'ai vu mes machines <em>brûler.</em>", ["5 % de térahash bonus", "VIP Platinum+"]),
+        "gomining-promo-code": ("Code promo GoMining : <em>RINGO5</em>", ["5 % de térahash bonus", "VIP Platinum+"]),
         "is-gomining-legit": ("GoMining est-il <em>fiable ?</em> Ce que j'ai vérifié", ["Vraies fermes en vidéo", "10+ ans de crypto"]),
         "gomining-review": ("Mon avis GoMining : <em>33 733 $</em> minés en 17 mois", ["Vraies captures", "Brut vs net"]),
         "is-gomining-profitable": ("GoMining est-il <em>rentable</em> en 2026 ?", ["Vrais chiffres nets", "APR de staking en direct"]),
@@ -42,8 +46,8 @@ TEXT = {
         "guides": ("Tout ce que je vous dirais sur <em>GoMining</em>", ["8 guides francs", "Vrais chiffres"]),
     },
     "es": {
-        "home": ("Gané <em>1 M$</em> con una meme coin. Luego vi mis máquinas <em>arder.</em>", ["5 % de terahash de bono", "10 % de vuelta"]),
-        "gomining-promo-code": ("Código promocional GoMining: <em>RINGO5</em>", ["5 % de terahash de bono", "10 % de vuelta"]),
+        "home": ("Gané <em>1 M$</em> con una meme coin. Luego vi mis máquinas <em>arder.</em>", ["5 % de terahash de bono", "VIP Platinum+"]),
+        "gomining-promo-code": ("Código promocional GoMining: <em>RINGO5</em>", ["5 % de terahash de bono", "VIP Platinum+"]),
         "is-gomining-legit": ("¿GoMining es <em>confiable?</em> Lo que revisé", ["Granjas reales en video", "10+ años en cripto"]),
         "gomining-review": ("Mi opinión de GoMining: <em>33.733 $</em> minados en 17 meses", ["Capturas reales", "Bruto vs neto"]),
         "is-gomining-profitable": ("¿GoMining es <em>rentable</em> en 2026?", ["Números netos reales", "APR de staking en vivo"]),
@@ -54,8 +58,8 @@ TEXT = {
         "guides": ("Todo lo que te contaría sobre <em>GoMining</em>", ["8 guías directas", "Números reales"]),
     },
     "de": {
-        "home": ("<em>1 Mio. $</em> mit einem Memecoin. Dann sah ich meine Miner <em>brennen.</em>", ["5 % Bonus-Terahash", "10 % zurück"]),
-        "gomining-promo-code": ("GoMining Promo-Code: <em>RINGO5</em>", ["5 % Bonus-Terahash", "10 % zurück"]),
+        "home": ("<em>1 Mio. $</em> mit einem Memecoin. Dann sah ich meine Miner <em>brennen.</em>", ["5 % Bonus-Terahash", "VIP Platinum+"]),
+        "gomining-promo-code": ("GoMining Promo-Code: <em>RINGO5</em>", ["5 % Bonus-Terahash", "VIP Platinum+"]),
         "is-gomining-legit": ("Ist GoMining <em>seriös?</em> Was ich geprüft habe", ["Echte Farmen im Video", "10+ Jahre Krypto"]),
         "gomining-review": ("Meine GoMining-Erfahrungen: <em>33.733 $</em> in 17 Monaten", ["Echte Screenshots", "Brutto vs. netto"]),
         "is-gomining-profitable": ("Lohnt sich <em>GoMining</em> 2026?", ["Echte Netto-Zahlen", "Live-Staking-APR"]),
@@ -95,6 +99,8 @@ async def main():
             import os
             os.makedirs(f"{R}/assets/img/og/{lang}", exist_ok=True)
             for key, (h, chips) in items.items():
+                if ONLY and f"{lang}/{key}" not in ONLY:
+                    continue
                 bg = BG[key]
                 back = (f'<img class="shot" src="file://{R}/assets/img/review/earnings.png">' if bg == "REVIEW"
                         else f'<div class="bg" style="background-image:url(file://{R}/assets/img/{bg})"></div>')
