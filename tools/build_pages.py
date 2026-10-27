@@ -265,6 +265,7 @@ def footer(lang):
 <script src="/assets/js/main.js?v={VER}"></script>
 <script src="/assets/js/article.js?v={VER}"></script>
 <script src="/assets/js/lang.js?v={VER}"></script>
+<script src="/assets/js/copilot.js?v={VER}"></script>
 <script src="https://gmt-optimizer.com/assets/rates.js" async></script>
 <script src="https://gmt-optimizer.com/assets/embed.js" async></script>
 </body>
