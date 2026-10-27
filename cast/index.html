@@ -42,7 +42,10 @@
   <input id="room" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
 
   <div class="row">
-    <label><input type="checkbox" id="audio" style="width:auto" checked> Include audio</label>
+    <label><input type="checkbox" id="mic" style="width:auto" checked> Microphone (your voice)</label>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="audio" style="width:auto"> Phone sound (if iOS allows it)</label>
   </div>
 
   <button id="go">Start sharing</button>
@@ -64,7 +67,8 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), box = $('statusBox'), statusEl = $('status'), preview = $('preview'), audioEl = $('audio');
+  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), box = $('statusBox'), statusEl = $('status'), preview = $('preview'), audioEl = $('audio'), micEl = $('mic');
+  let micStream = null, audioCtx = null, callSeq = 0, screenStream = null;
   const PREFIX = 'ringocast-';
   let peer = null, call = null, stream = null;
 
@@ -88,6 +92,9 @@
     if (call) { try { call.close(); } catch (e) {} call = null; }
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
     preview.srcObject = null; preview.style.display = 'none';
     goBtn.hidden = false; goBtn.disabled = !supported; stopBtn.hidden = true;
     setStatus(msg || 'Stopped', kind);
@@ -113,7 +120,7 @@
   }
   window.addEventListener('error', e => log('page error: ' + e.message));
 
-  let room = '', retryTimer = null, connected = false;
+  let room = '', retryTimer = null, connected = false, startedAt = 0;
 
   function scheduleRetry(why) {
     if (!stream) return;
@@ -130,6 +137,7 @@
       peer = new Peer({ debug: 1 });
       peer.on('error', e => {
         log('signal error: ' + e.type + (e.message ? ' (' + e.message + ')' : ''));
+        if (connected) return;   // a leftover error from an earlier attempt; we're already live
         if (e.type === 'peer-unavailable') scheduleRetry('OBS viewer not found for room ' + room + '. Is it open in OBS?');
         else scheduleRetry('Connection error.');
       });
@@ -147,16 +155,16 @@
     setStatus('Connecting to OBS…');
     try { await ensurePeer(); } catch (e) { log(e.message); return scheduleRetry("Can't reach the connection server."); }
     if (!stream) return;
-    if (call) { try { call.close(); } catch (e) {} call = null; }
+    if (call) { const old = call; call = null; try { old.close(); } catch (e) {} }
     log('calling room ' + room);
-    const c = peer.call(PREFIX + room, stream);
+    const c = peer.call(PREFIX + room, stream, { metadata: { seq: ++callSeq, started: startedAt } });
     if (!c) return scheduleRetry('Could not call OBS.');
     call = c;
     const pc = c.peerConnection;
     if (pc) pc.addEventListener('connectionstatechange', () => {
       if (call !== c) return;
       const st = pc.connectionState; log('link: ' + st);
-      if (st === 'connected') { connected = true; setStatus('Live in OBS · room ' + room, 'live'); boostBitrate(pc); }
+      if (st === 'connected') { connected = true; clearTimeout(retryTimer); setStatus('Live in OBS · room ' + room, 'live'); boostBitrate(pc); }
       else if (st === 'failed') scheduleRetry('Connection to OBS failed.');
       else if (st === 'disconnected') {
         setStatus('Connection dropped, waiting…');
@@ -174,24 +182,54 @@
     goBtn.disabled = true;
     setStatus('Pick what to share…');
 
+    startedAt = Date.now();
+    try { const AC = window.AudioContext || window.webkitAudioContext; if (micEl.checked && audioEl.checked && AC) audioCtx = new AC(); } catch (e) {}
+    let screen;
     try {
       try {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioEl.checked });
+        screen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioEl.checked });
       } catch (e1) {
         if (!audioEl.checked || (e1 && e1.name === 'NotAllowedError')) throw e1;
-        log('phone refused audio (' + (e1 && e1.name) + '), trying video only');
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        log('phone refused its own sound (' + (e1 && e1.name) + '), trying video only');
+        screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
       }
     } catch (e) {
       log('capture failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
       cleanup(e && e.name === 'NotAllowedError' ? 'Sharing was cancelled.' : 'Could not start screen sharing: ' + (e && e.message || e), 'err');
       return;
     }
+    stream = screen;
+
+    if (micEl.checked) {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } });
+        log('mic: on (' + (micStream.getAudioTracks()[0].label || 'microphone') + ')');
+      } catch (e) {
+        log('mic: blocked (' + (e && e.name) + '). Allow the microphone for this site in Safari.');
+      }
+    }
+
+    const screenAudio = screen.getAudioTracks();
+    const micAudio = micStream ? micStream.getAudioTracks() : [];
+    let audioTrack = null;
+    if (screenAudio.length && micAudio.length && audioCtx) {
+      try {
+        const dest = audioCtx.createMediaStreamDestination();
+        audioCtx.createMediaStreamSource(new MediaStream(screenAudio)).connect(dest);
+        audioCtx.createMediaStreamSource(new MediaStream(micAudio)).connect(dest);
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        audioTrack = dest.stream.getAudioTracks()[0];
+        log('audio: mixing phone sound + mic');
+      } catch (e) { log('mix failed, using mic only'); audioTrack = micAudio[0]; }
+    } else {
+      audioTrack = micAudio[0] || screenAudio[0] || null;
+    }
+    stream = new MediaStream([...screen.getVideoTracks(), ...(audioTrack ? [audioTrack] : [])]);
+    screenStream = screen;
 
     const vt = stream.getVideoTracks()[0];
     log('capture started: ' + (vt ? vt.label || 'video' : 'no video track') + ' ' + JSON.stringify(vt && vt.getSettings ? (({width,height,frameRate}) => ({width,height,frameRate}))(vt.getSettings()) : {}));
-    const at = stream.getAudioTracks();
-    log(at.length ? 'audio: sharing (' + (at[0].label || 'audio') + ')' : (audioEl.checked ? 'audio: NONE, the iPhone did not include sound' : 'audio: off (Include audio unchecked)'));
+    log(!audioTrack ? 'audio: NONE, nothing will be heard' : screenAudio.length && !micAudio.length ? 'audio: phone sound' : !screenAudio.length && audioEl.checked ? 'audio: mic only (iPhone did not share its own sound)' : 'audio: ok');
     stream.getTracks().forEach(t => {
       t.addEventListener('ended', () => { log(t.kind + ' track ended by the phone'); if (t.kind === 'video') cleanup('iPhone ended the screen share.', 'err'); });
       t.addEventListener('mute', () => log(t.kind + ' track paused by the phone'));
