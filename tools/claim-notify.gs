@@ -1,11 +1,11 @@
 /**
- * RinGoMining: instant emails when someone claims their bonus.
+ * RinGoMining: instant emails when someone sends their GoMining ID.
  *
  * Every time the claim form (ringomining.com/apply) is submitted:
  *  1. The person gets a confirmation email from you right away, in their
  *     language (English, French, Spanish or German).
- *  2. You get an alert email with their GoMining ID and wallet details,
- *     so you can check your referral list and pay fast.
+ *  2. You get an alert email with their GoMining ID,
+ *     so you can check your referral list and reach out fast.
  *
  * HOW TO SET UP (one time)
  * 1. Open your existing RinGoMining Apps Script project (the one with
@@ -66,35 +66,31 @@ function langOf_(claim) {
 
 var CLAIM_MAIL = {
   en: {
-    subject: 'Got your RINGO5 claim',
-    body: 'Hey,\n\nRingo here. I got your claim for the RINGO5 bonus.\n\nGoMining ID: {gmid}\nPaid in: {coin}\n\n' +
-      "Here's what happens next: I check your ID against my referral list and confirm your purchase. " +
-      'Then I send your bonus within 24 hours of confirming.\n\n' +
-      "If you haven't bought your terahash yet, go ahead whenever you're ready. Your 10% back is based on what you buy.\n\n" +
+    subject: 'Got your GoMining ID',
+    body: 'Hey,\n\nRingo here. Got your GoMining ID: {gmid}\n\n' +
+      "I'll check it against my referral list to confirm you're under my code RINGO5.\n\n" +
+      "If you haven't bought your terahash yet, go ahead whenever you're ready. GoMining adds 5% bonus terahash to your first miner.\n\n" +
       'Questions? Just reply to this email, or message me on Telegram: {tg}\n\nRingo\nringomining.com'
   },
   fr: {
-    subject: 'Demande RINGO5 bien reçue',
-    body: 'Bonjour,\n\nIci Ringo. J\'ai bien reçu votre demande de bonus RINGO5.\n\nID GoMining : {gmid}\nPaiement en : {coin}\n\n' +
-      'La suite : je vérifie votre ID dans ma liste de filleuls et je confirme votre achat. ' +
-      'Ensuite, j\'envoie votre bonus sous 24 heures après vérification.\n\n' +
-      'Si vous n\'avez pas encore acheté votre térahash, faites-le quand vous êtes prêt. Vos 10 % remboursés sont calculés sur ce que vous achetez.\n\n' +
+    subject: 'ID GoMining bien reçu',
+    body: 'Bonjour,\n\nIci Ringo. J\'ai bien reçu votre ID GoMining : {gmid}\n\n' +
+      'Je le vérifie dans ma liste de filleuls pour confirmer que vous êtes inscrit avec mon code RINGO5.\n\n' +
+      'Si vous n\'avez pas encore acheté votre térahash, faites-le quand vous êtes prêt. GoMining ajoute 5 % de térahash bonus à votre premier mineur.\n\n' +
       'Des questions ? Répondez simplement à cet e-mail, ou écrivez-moi sur Telegram : {tg}\n\nRingo\nringomining.com'
   },
   es: {
-    subject: 'Recibí tu solicitud RINGO5',
-    body: 'Hola,\n\nSoy Ringo. Recibí tu solicitud del bono RINGO5.\n\nID de GoMining: {gmid}\nPago en: {coin}\n\n' +
-      'Lo que sigue: reviso tu ID en mi lista de referidos y confirmo tu compra. ' +
-      'Después te envío el bono dentro de las 24 horas tras confirmarlo.\n\n' +
-      'Si todavía no compraste tu terahash, hazlo cuando estés listo. Tu 10 % de vuelta se calcula sobre lo que compres.\n\n' +
+    subject: 'Recibí tu ID de GoMining',
+    body: 'Hola,\n\nSoy Ringo. Recibí tu ID de GoMining: {gmid}\n\n' +
+      'Lo reviso en mi lista de referidos para confirmar que estás con mi código RINGO5.\n\n' +
+      'Si todavía no compraste tu terahash, hazlo cuando estés listo. GoMining añade un 5 % de terahash de bono a tu primer minero.\n\n' +
       '¿Preguntas? Responde a este correo o escríbeme por Telegram: {tg}\n\nRingo\nringomining.com'
   },
   de: {
-    subject: 'Deine RINGO5-Anfrage ist da',
-    body: 'Hey,\n\nhier ist Ringo. Ich habe deine Anfrage für den RINGO5-Bonus bekommen.\n\nGoMining-ID: {gmid}\nAuszahlung in: {coin}\n\n' +
-      'So geht es weiter: Ich prüfe deine ID in meiner Empfehlungsliste und bestätige deinen Kauf. ' +
-      'Dann schicke ich deinen Bonus innerhalb von 24 Stunden nach der Bestätigung.\n\n' +
-      'Falls du deinen Terahash noch nicht gekauft hast, mach das, wenn du bereit bist. Deine 10 % zurück richten sich nach deinem Kauf.\n\n' +
+    subject: 'Deine GoMining-ID ist da',
+    body: 'Hey,\n\nhier ist Ringo. Ich habe deine GoMining-ID bekommen: {gmid}\n\n' +
+      'Ich prüfe sie in meiner Empfehlungsliste, um zu bestätigen, dass du über meinen Code RINGO5 dabei bist.\n\n' +
+      'Falls du deinen Terahash noch nicht gekauft hast, mach das, wenn du bereit bist. GoMining legt 5 % Bonus-Terahash auf deinen ersten Miner drauf.\n\n' +
       'Fragen? Antworte einfach auf diese E-Mail oder schreib mir auf Telegram: {tg}\n\nRingo\nringomining.com'
   }
 };
@@ -111,8 +107,7 @@ function sendCustomerEmail_(claim) {
 function sendOwnerAlert_(claim) {
   var me = Session.getEffectiveUser().getEmail();
   var body = 'New claim on ringomining.com/apply\n\n' +
-    'Email: ' + claim.email + '\nGoMining ID: ' + claim.gmid + '\nPaid in: ' + claim.coin +
-    '\nChain: ' + claim.chain + '\nWallet: ' + claim.wallet +
+    'Email: ' + claim.email + '\nGoMining ID: ' + claim.gmid +
     (claim.notes ? '\nNotes: ' + claim.notes : '') +
     '\n\nCheck the ID against your GoMining referral list, then update it in the tracker: ' + CLAIM_ADMIN;
   MailApp.sendEmail({ to: me, subject: 'New RINGO5 claim: ID ' + (claim.gmid || '?') + ' (' + claim.email + ')',

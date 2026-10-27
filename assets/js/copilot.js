@@ -1,7 +1,7 @@
 /*
   RinGoMining co-pilot: a scripted guide in Ringo's voice. No AI, no API, no backend.
-  It walks people through sign up -> buy -> claim, answers the common questions,
-  fills in the claim (posts to the same Google Form as /apply), and hands anything
+  It walks people through sign up -> buy -> send GoMining ID, answers the common questions,
+  sends their ID (posts to the same Google Form as /apply), and hands anything
   off-script to Ringo on Telegram or text.
 
   Edit the wording in NODES below. Each node has:
@@ -23,11 +23,11 @@
 
   var NODES = {
     start: {
-      say: ["What's up, Ringo Mining here.", "I'll walk you through getting set up with my code <b>" + CODE + "</b> and claiming your bonus. About five minutes. Where are you at?"],
+      say: ["What's up, Ringo Mining here.", "I'll walk you through getting set up with my code <b>" + CODE + "</b>. About five minutes. Where are you at?"],
       opts: [
         { t: "Brand new, let's go", go: "signup" },
         { t: "I already have a GoMining account", go: "existing" },
-        { t: "I already bought, pay me", go: "claim" },
+        { t: "I already bought", go: "claim" },
         { t: "I've got questions first", go: "faq" }
       ]
     },
@@ -45,7 +45,7 @@
       opts: [{ t: "Got it, next step", go: "buy" }, { t: "I'm stuck", go: "stuck" }]
     },
     existing: {
-      say: ["Real talk: my bonus only works on accounts created with <b>" + CODE + "</b>.", "If your account is less than 30 days old, add " + CODE + " in your profile before you buy. Older than that? Message me before you buy and we'll figure it out."],
+      say: ["Real talk: GoMining's new-user bonus only works on accounts created with <b>" + CODE + "</b>.", "If your account is less than 30 days old, add " + CODE + " in your profile before you buy. Older than that? Message me before you buy and we'll figure it out."],
       opts: [
         { t: "Added it ✓", go: "buy" },
         { t: "My account is older", go: "human" },
@@ -53,11 +53,10 @@
       ]
     },
     buy: {
-      say: ["<b>Step 2 of 3.</b> Buy your terahash, any amount.", "With my code, GoMining adds <b>5% bonus terahash</b> to your first miner. On top of that I send you <b>10% back</b> on purchases up to $10,000, and <b>5% back</b> on every upgrade after that."],
+      say: ["<b>Step 2 of 3.</b> Buy your terahash, any amount.", "With my code, GoMining adds <b>5% bonus terahash</b> to your first miner."],
       opts: [
         { t: "Bought it ✓", go: "claim" },
         { t: "How much should I start with?", go: "howmuch" },
-        { t: "I'm buying over $10,000", go: "big" },
         { t: "Questions first", go: "faq" }
       ]
     },
@@ -66,27 +65,18 @@
       links: [{ t: "Open the calculator", href: "/#calculator" }],
       opts: [{ t: "OK, I bought ✓", go: "claim" }, { t: "Back to step 2", go: "buy" }]
     },
-    big: {
-      say: ["Over $10,000, message me directly before you buy and we'll work out your bonus."],
-      links: [{ t: "Message me on Telegram", kind: "tg" }, { t: "Text me", kind: "sms" }],
-      opts: [{ t: "Back to step 2", go: "buy" }]
-    },
     claim: {
-      say: ["<b>Step 3 of 3.</b> Let's get you paid.", "I need three things: your email, your GoMining ID, and your GoMining BSC deposit address. I'll fill in the claim for you as we go."],
+      say: ["<b>Step 3 of 3.</b> Send me your GoMining ID so I can confirm you're under my code.", "I need two things: your email and your GoMining ID. I'll fill it in for you as we go."],
       opts: [{ t: "Let's do it", go: "q_email" }, { t: "Wait, I haven't bought yet", go: "buy" }]
     },
     q_email: {
-      say: ["What's your email? That's where I'll confirm your bonus."],
+      say: ["What's your email? That's where I'll get back to you."],
       ask: { key: "email", label: "Email", type: "email", check: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, bad: "That email doesn't look right. Try again?", next: "q_id" }
     },
     q_id: {
       say: ["Now your GoMining ID. In GoMining, tap your profile picture (top right). It's the number right under your name."],
       img: { src: "/assets/img/find-your-id.png", alt: "GoMining profile card with the ID number under the name highlighted" },
-      ask: { key: "gmid", label: "GoMining ID", type: "text", mode: "numeric", check: /^\d{3,}$/, bad: "Just the numbers, like 3566334.", next: "q_wallet" }
-    },
-    q_wallet: {
-      say: ["Last one: your GoMining BSC deposit address. That's where your bonus lands.", "In GoMining: open your <b>Wallet</b>, tap <b>Deposit</b>, pick <b>GOMINING</b> and the <b>BNB Smart Chain (BEP-20)</b> network, then copy the address. It starts with 0x."],
-      ask: { key: "wallet", label: "Deposit address", type: "text", check: /^0x[0-9a-fA-F]{40}$/, bad: "That's not a full BSC address. It starts with 0x and has 40 characters after it. Paste it straight from GoMining.", next: "q_tg" }
+      ask: { key: "gmid", label: "GoMining ID", type: "text", mode: "numeric", check: /^\d{3,}$/, bad: "Just the numbers, like 3566334.", next: "q_tg" }
     },
     q_tg: {
       say: ["Want to drop your Telegram handle so I can reach you faster? Totally optional."],
@@ -94,12 +84,12 @@
     },
     review: { say: [], review: true },
     sent: {
-      say: ["Claim received. 🔥", "I check your GoMining ID against my referral list, then send your bonus in GOMINING tokens on BNB Smart Chain within 24 hours of confirming. Watch your email.", "Welcome to the team."],
+      say: ["Got it. 🔥", "I check your GoMining ID against my referral list to confirm you're under my code. Watch your email.", "Welcome to the team."],
       links: [{ t: "Message me on Telegram", kind: "tg" }],
       opts: [{ t: "I've got a question", go: "faq" }]
     },
     sendfail: {
-      say: ["Hmm, that didn't send. Check your connection and try again, or send me your ID and address on Telegram and I'll set you up by hand."],
+      say: ["Hmm, that didn't send. Check your connection and try again, or send me your ID on Telegram and I'll set you up by hand."],
       links: [{ t: "Message me on Telegram", kind: "tg" }],
       opts: [{ t: "Try again", go: "review" }]
     },
@@ -107,7 +97,6 @@
       say: ["Ask away. What's on your mind?"],
       opts: [
         { t: "Is GoMining legit?", go: "f_legit" },
-        { t: "How do I get my bonus paid?", go: "f_paid" },
         { t: "How do I get money to my bank?", go: "f_bank" },
         { t: "What's in it for you?", go: "f_you" },
         { t: "I don't really get crypto", go: "f_newbie" },
@@ -119,17 +108,13 @@
       links: [{ t: "Read my full review", href: "/gomining-review/" }],
       opts: [{ t: "Another question", go: "faq" }, { t: "Let's get started", go: "signup" }]
     },
-    f_paid: {
-      say: ["In GOMINING tokens on BNB Smart Chain, sent to your GoMining deposit address within 24 hours of me confirming you signed up with my code and your purchase went through."],
-      opts: [{ t: "Another question", go: "faq" }, { t: "Let's get started", go: "signup" }]
-    },
     f_bank: {
       say: ["Here's how I do it. I withdraw on BNB Smart Chain, swap to USDC, send it to Coinbase, then to my bank.", "Or skip all that and spend it with the GoMining Visa card through Apple Pay."],
       links: [{ t: "Open Coinbase ↗", href: "https://coinbase.com/join/MC6T569" }],
       opts: [{ t: "Another question", go: "faq" }, { t: "Let's get started", go: "signup" }]
     },
     f_you: {
-      say: ["Full transparency: GoMining pays me a referral commission plus ongoing ambassador rewards tied to your mining fees.", "The bonus is me sharing part of that with you. That's why I want you set up right."],
+      say: ["Full transparency: GoMining pays me a referral commission plus ongoing ambassador rewards tied to your mining fees.", "That's why I want you set up right."],
       opts: [{ t: "Another question", go: "faq" }, { t: "Let's get started", go: "signup" }]
     },
     f_newbie: {
@@ -141,7 +126,6 @@
       say: ["No problem. Where are you stuck?"],
       opts: [
         { t: "Can't find my GoMining ID", go: "h_id" },
-        { t: "Can't find my deposit address", go: "h_wallet" },
         { t: "Something else", go: "human" }
       ]
     },
@@ -149,10 +133,6 @@
       say: ["In GoMining, tap your profile picture in the top right. Your ID is the number right under your name."],
       img: { src: "/assets/img/find-your-id.png", alt: "GoMining profile card with the ID number under the name highlighted" },
       opts: [{ t: "Found it ✓", go: "buy" }, { t: "Still stuck", go: "human" }]
-    },
-    h_wallet: {
-      say: ["Open your Wallet in GoMining, tap Deposit, pick GOMINING and the BNB Smart Chain (BEP-20) network, then copy the address. It starts with 0x."],
-      opts: [{ t: "Found it ✓", go: "claim" }, { t: "Still stuck", go: "human" }]
     },
     human: {
       say: ["Hit me up directly. I answer myself, usually pretty quick."],
@@ -364,20 +344,20 @@
 
   function review() {
     var d = state.data;
-    bot(["Here's your claim. Look right?"], false, function () {
+    bot(["Here's what I've got. Look right?"], false, function () {
       var card = el("div", "rc-msg rc-bot rc-card");
-      [["Email", d.email], ["GoMining ID", d.gmid], ["Deposit address", d.wallet], ["Telegram", d.tg || "none"]].forEach(function (r) {
+      [["Email", d.email], ["GoMining ID", d.gmid], ["Telegram", d.tg || "none"]].forEach(function (r) {
         var row = el("div"); var k = el("span"); var v = el("b");
         k.textContent = r[0]; v.textContent = r[1] || "";
         row.appendChild(k); row.appendChild(v); card.appendChild(row);
       });
       log.appendChild(card);
       var fine = el("div", "rc-fine");
-      fine.innerHTML = 'By sending, you agree to the <a href="/disclaimer">bonus terms and disclaimer</a>. I\'m an independent ambassador, not affiliated with GoMining. Not financial advice.';
+      fine.innerHTML = 'By sending, you agree to the <a href="/disclaimer">disclaimer</a>. I\'m an independent ambassador, not affiliated with GoMining. Not financial advice.';
       log.appendChild(fine);
       scroll();
       var wrap = el("div", "rc-opts");
-      var s = el("button", "rc-opt rc-primary"); s.type = "button"; s.textContent = "Send my claim →";
+      var s = el("button", "rc-opt rc-primary"); s.type = "button"; s.textContent = "Send it →";
       s.addEventListener("click", function () { submit(s); });
       var fix = el("button", "rc-opt"); fix.type = "button"; fix.textContent = "Fix something";
       fix.addEventListener("click", function () { me("Fix something"); go("q_email"); });
@@ -388,13 +368,13 @@
 
   function submit(btn) {
     var d = state.data;
-    if (!d.email || !d.gmid || !d.wallet) { bot(["I'm missing something. Let's run through it again."], true); return go("q_email"); }
+    if (!d.email || !d.gmid) { bot(["I'm missing something. Let's run through it again."], true); return go("q_email"); }
     var id = C.FORM_STEP3_ID, map = C.ENTRIES_STEP3 || {};
-    if (!id || !map.email) { me("Send my claim"); return go("sendfail"); }
+    if (!id || !map.email) { me("Send it"); return go("sendfail"); }
     btn.disabled = true; btn.textContent = "Sending…";
     var body = new URLSearchParams();
     var vals = {
-      email: d.email, gmid: d.gmid, wallet: d.wallet,
+      email: d.email, gmid: d.gmid, wallet: "Not collected",
       coin: "GoMining token (GMT)", chain: "BNB Smart Chain (BEP-20)",
       notes: (d.tg ? d.tg + "\n" : "") + "Sent from the co-pilot chat"
     };
@@ -402,9 +382,9 @@
     fetch("https://docs.google.com/forms/d/e/" + id + "/formResponse", { method: "POST", mode: "no-cors", body: body })
       .then(function () {
         try { localStorage.setItem("ringo_STEP3", "1"); } catch (e) {}
-        me("Send my claim");
+        me("Send it");
         state.data = {}; go("sent");
       })
-      .catch(function () { me("Send my claim"); go("sendfail"); });
+      .catch(function () { me("Send it"); go("sendfail"); });
   }
 })();

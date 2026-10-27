@@ -75,8 +75,8 @@ def blocks(lang):
   <p>{t['offer_p']}</p>
   <div class="offer">
     <div class="card"><div class="big">{t['c1_big']}</div><h3>{t['c1_h']}</h3><p>{t['c1_p']}</p></div>
-    <div class="card"><div class="big">10%</div><h3>{t['c2_h']}</h3><p>{t['c2_p']}</p></div>
-    <div class="card"><div class="big">5%</div><h3>{t['c3_h']}</h3><p>{t['c3_p']}</p></div>
+    <div class="card"><div class="big">{t['c2_big']}</div><h3>{t['c2_h']}</h3><p>{t['c2_p']}</p></div>
+    <div class="card"><div class="big">{t['c3_big']}</div><h3>{t['c3_h']}</h3><p>{t['c3_p']}</p></div>
     <div class="card"><div class="big">{t['c4_big']}</div><h3>{t['c4_h']}</h3><p>{t['c4_p']}</p></div>
   </div>
   <p class="fine">{t['offer_fine']} <a href="{P}/disclaimer">{t['terms']}</a>.</p>
