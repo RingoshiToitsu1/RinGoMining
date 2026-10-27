@@ -42,7 +42,7 @@
   <input id="room" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
 
   <div class="row">
-    <label><input type="checkbox" id="audio" style="width:auto"> Include audio</label>
+    <label><input type="checkbox" id="audio" style="width:auto" checked> Include audio</label>
   </div>
 
   <button id="go">Start sharing</button>
@@ -175,7 +175,13 @@
     setStatus('Pick what to share…');
 
     try {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioEl.checked });
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioEl.checked });
+      } catch (e1) {
+        if (!audioEl.checked || (e1 && e1.name === 'NotAllowedError')) throw e1;
+        log('phone refused audio (' + (e1 && e1.name) + '), trying video only');
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      }
     } catch (e) {
       log('capture failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
       cleanup(e && e.name === 'NotAllowedError' ? 'Sharing was cancelled.' : 'Could not start screen sharing: ' + (e && e.message || e), 'err');
@@ -184,6 +190,8 @@
 
     const vt = stream.getVideoTracks()[0];
     log('capture started: ' + (vt ? vt.label || 'video' : 'no video track') + ' ' + JSON.stringify(vt && vt.getSettings ? (({width,height,frameRate}) => ({width,height,frameRate}))(vt.getSettings()) : {}));
+    const at = stream.getAudioTracks();
+    log(at.length ? 'audio: sharing (' + (at[0].label || 'audio') + ')' : (audioEl.checked ? 'audio: NONE, the iPhone did not include sound' : 'audio: off (Include audio unchecked)'));
     stream.getTracks().forEach(t => {
       t.addEventListener('ended', () => { log(t.kind + ' track ended by the phone'); if (t.kind === 'video') cleanup('iPhone ended the screen share.', 'err'); });
       t.addEventListener('mute', () => log(t.kind + ' track paused by the phone'));
