@@ -124,7 +124,8 @@
       opts: [{ t: "Another question", go: "faq" }, { t: "Let's get started", go: "signup" }]
     },
     f_bank: {
-      say: ["Here's how I do it. I withdraw on BNB Smart Chain, swap to USDC, send it to Kraken, then to my bank.", "Or skip all that and spend it with the GoMining Visa card through Apple Pay."],
+      say: ["Here's how I do it. I withdraw on BNB Smart Chain, swap to USDC, send it to Coinbase, then to my bank.", "Or skip all that and spend it with the GoMining Visa card through Apple Pay."],
+      links: [{ t: "Open Coinbase ↗", href: "https://coinbase.com/join/MC6T569" }],
       opts: [{ t: "Another question", go: "faq" }, { t: "Let's get started", go: "signup" }]
     },
     f_you: {
@@ -278,7 +279,7 @@
     var a = el("a", "rc-link" + (l.kind === "ref" ? " rc-fire" : ""));
     a.textContent = l.t;
     a.href = l.kind === "ref" ? REF : l.kind === "tg" ? TG : l.kind === "sms" ? SMS : l.href;
-    if (l.kind === "ref" || l.kind === "tg") { a.target = "_blank"; a.rel = "noopener"; }
+    if (l.kind === "ref" || l.kind === "tg" || /^https?:/.test(l.href || "")) { a.target = "_blank"; a.rel = "noopener"; }
     if (l.href && l.href.charAt(0) === "/" && l.href.indexOf("#") > -1 && location.pathname === "/") {
       a.addEventListener("click", function () { close(); });
     }
