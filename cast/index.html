@@ -15,51 +15,71 @@
   h1{font-size:26px;margin:0 0 4px;letter-spacing:.02em}
   h1 span{color:var(--orange)}
   p.sub{margin:0 0 22px;color:var(--muted)}
-  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px;text-transform:uppercase;letter-spacing:.08em}
-  input{width:100%;padding:14px;font:600 22px/1 ui-monospace,Menlo,monospace;letter-spacing:.15em;text-transform:uppercase;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px}
-  input:focus{outline:2px solid var(--orange);border-color:transparent}
+  .lbl{display:block;font-size:13px;color:var(--muted);margin:18px 0 6px;text-transform:uppercase;letter-spacing:.08em}
+  #room{width:100%;padding:14px;font:600 22px/1 ui-monospace,Menlo,monospace;letter-spacing:.15em;text-transform:uppercase;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px}
+  #room:focus{outline:2px solid var(--orange);border-color:transparent}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px;gap:4px}
+  .seg button{flex:1;margin:0;padding:12px 8px;background:transparent;color:var(--muted);font-size:15px}
+  .seg button[aria-pressed="true"]{background:var(--orange);color:#1e1915}
+  .seg button:disabled{opacity:.35}
+  .check{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:15px}
+  .check input{width:20px;height:20px;accent-color:var(--orange)}
   button{width:100%;margin-top:14px;padding:16px;font-family:inherit;font-weight:700;font-size:17px;line-height:1;border:0;border-radius:10px;cursor:pointer}
   #go{background:var(--orange);color:#1e1915}
-  #stop{background:var(--card);color:var(--text);border:1px solid var(--line)}
+  .ctl{display:flex;gap:8px;margin-top:14px}
+  .ctl button{margin:0;background:var(--card);color:var(--text);border:1px solid var(--line);font-size:15px;padding:14px 8px}
+  .ctl button.on{background:var(--red);border-color:var(--red);color:#fff}
   button:disabled{opacity:.5}
-  .status{margin-top:18px;padding:12px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .status{margin-top:16px;padding:12px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;gap:10px;align-items:center}
   .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
   .live .dot{background:var(--green);box-shadow:0 0 0 4px rgba(76,195,138,.2)}
   .err .dot{background:var(--red)}
-  video{width:100%;margin-top:16px;border-radius:10px;background:#000;display:none}
-  .tips{margin-top:22px;color:var(--muted);font-size:14px}
+  #preview{width:100%;margin-top:16px;border-radius:10px;background:#000;display:none;max-height:60vh;object-fit:contain}
+  #preview.mirror{transform:scaleX(-1)}
+  #log{margin-top:16px;padding:10px 12px;background:#000;border:1px solid var(--line);border-radius:10px;color:var(--muted);font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:160px;overflow:auto}
+  #log:empty{display:none}
+  .tips{margin-top:22px;color:var(--muted);font-size:14px;padding-left:20px}
   .tips li{margin-bottom:6px}
-  .row{display:flex;gap:10px}
-  .row label{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:15px;color:var(--text);margin-top:14px}
+  [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main>
   <h1>RINGO<span>CAST</span></h1>
-  <p class="sub">Send this phone's screen to OBS over Wi-Fi.</p>
+  <p class="sub">Use this phone as a wireless camera in OBS.</p>
 
-  <label for="room">Room code (shown in OBS)</label>
-  <input id="room" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
+  <div id="setup">
+    <label class="lbl" for="room">Room code (shown in OBS)</label>
+    <input id="room" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
 
-  <div class="row">
-    <label><input type="checkbox" id="mic" style="width:auto" checked> Microphone (your voice)</label>
+    <span class="lbl">Send</span>
+    <div class="seg" id="mode">
+      <button type="button" data-mode="camera" aria-pressed="true">Camera</button>
+      <button type="button" data-mode="screen" aria-pressed="false">Screen</button>
+    </div>
+
+    <label class="check"><input type="checkbox" id="mic" checked> Microphone</label>
+    <label class="check" id="soundRow" hidden><input type="checkbox" id="audio"> Phone sound (if iOS allows it)</label>
+
+    <button id="go">Go live</button>
   </div>
-  <div class="row">
-    <label><input type="checkbox" id="audio" style="width:auto"> Phone sound (if iOS allows it)</label>
-  </div>
 
-  <button id="go">Start sharing</button>
-  <button id="stop" hidden>Stop</button>
+  <div id="live" hidden>
+    <div class="ctl">
+      <button id="flip">Flip camera</button>
+      <button id="muteBtn">Mute mic</button>
+      <button id="stop">Stop</button>
+    </div>
+  </div>
 
   <div class="status" id="statusBox"><span class="dot"></span><span id="status">Not connected</span></div>
   <video id="preview" muted playsinline autoplay></video>
+  <pre id="log"></pre>
 
-  <pre id="log" style="margin-top:16px;padding:10px 12px;background:#000;border:1px solid var(--line);border-radius:10px;color:var(--muted);font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:180px;overflow:auto"></pre>
-
-  <ul class="tips">
-    <li>Open the viewer link in OBS first, then tap Start here.</li>
-    <li>Keep the phone and computer on the same Wi-Fi for the best quality.</li>
-    <li>Turn on Do Not Disturb so notifications don't end up in your video.</li>
+  <ul class="tips" id="tips">
+    <li>Open the viewer link in OBS first, then tap Go live here.</li>
+    <li>Keep this page open on the phone. If you switch apps or lock the phone, iOS pauses the camera.</li>
+    <li>Same Wi-Fi as the computer gives the best quality. Plug the phone in for long streams.</li>
   </ul>
 </main>
 
@@ -67,40 +87,75 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), box = $('statusBox'), statusEl = $('status'), preview = $('preview'), audioEl = $('audio'), micEl = $('mic');
-  let micStream = null, audioCtx = null, callSeq = 0, screenStream = null;
+  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), flipBtn = $('flip'), muteBtn = $('muteBtn');
+  const box = $('statusBox'), statusEl = $('status'), preview = $('preview'), logEl = $('log');
+  const micEl = $('mic'), audioEl = $('audio');
   const PREFIX = 'ringocast-';
-  let peer = null, call = null, stream = null;
+  const md = navigator.mediaDevices || {};
+  const canCamera = !!md.getUserMedia, canScreen = !!md.getDisplayMedia;
+
+  let peer = null, call = null, stream = null, extra = [], audioCtx = null, wakeLock = null;
+  let room = '', retryTimer = null, connected = false, startedAt = 0, callSeq = 0;
+  let mode = 'camera', facing = 'user';
 
   const params = new URLSearchParams(location.search);
   let saved = ''; try { saved = localStorage.getItem('ringocast-room') || ''; } catch (e) {}
   roomEl.value = (params.get('room') || saved).toUpperCase();
 
-  function setStatus(text, kind) {
-    statusEl.textContent = text;
-    box.className = 'status' + (kind ? ' ' + kind : '');
+  function log(msg) {
+    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    logEl.textContent = (t + '  ' + msg + '\n' + logEl.textContent).slice(0, 4000);
   }
+  window.addEventListener('error', e => log('page error: ' + e.message));
+  function setStatus(text, kind) { statusEl.textContent = text; box.className = 'status' + (kind ? ' ' + kind : ''); }
 
-  const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
-  if (!supported) {
-    goBtn.disabled = true;
-    setStatus("This browser can't share its screen. On iPhone, use Safari on iOS 27 or later.", 'err');
+  // ---- mode picker
+  const modeBtns = [...document.querySelectorAll('#mode button')];
+  function setMode(m) {
+    mode = m;
+    modeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    $('soundRow').hidden = m !== 'screen';
+    goBtn.disabled = m === 'camera' ? !canCamera : !canScreen;
+    if (m === 'screen' && !canScreen) setStatus("This phone's browser can't share its screen (needs iOS 27+). Camera works.", 'err');
+    else if (m === 'camera' && !canCamera) setStatus("This browser can't use the camera.", 'err');
+    else setStatus('Not connected');
+  }
+  modeBtns.forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  if (params.get('mode') === 'screen') setMode('screen'); else setMode('camera');
+  if (!canScreen) modeBtns.find(b => b.dataset.mode === 'screen').disabled = true;
+
+  // ---- keep the screen awake while live
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); } } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!stream) return;
+    if (document.visibilityState === 'visible') { keepAwake(); log('page back in front'); }
+    else log('page hidden: iOS may pause the camera/mic');
+  });
+
+  function showLiveUI(on) {
+    $('setup').hidden = on; $('live').hidden = !on; $('tips').hidden = on;
+    flipBtn.hidden = mode !== 'camera';
   }
 
   function cleanup(msg, kind) {
     clearTimeout(retryTimer);
-    if (call) { try { call.close(); } catch (e) {} call = null; }
+    if (call) { const c = call; call = null; try { c.close(); } catch (e) {} }
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    extra.forEach(t => t.stop()); extra = [];
     if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    connected = false;
     preview.srcObject = null; preview.style.display = 'none';
-    goBtn.hidden = false; goBtn.disabled = !supported; stopBtn.hidden = true;
+    muteBtn.classList.remove('on'); muteBtn.textContent = 'Mute mic';
+    showLiveUI(false);
+    goBtn.disabled = mode === 'camera' ? !canCamera : !canScreen;
     setStatus(msg || 'Stopped', kind);
   }
 
-  async function boostBitrate(pc) {
+  async function tuneSenders(pc) {
     for (const s of pc.getSenders()) {
       if (!s.track || s.track.kind !== 'video') continue;
       try {
@@ -113,15 +168,7 @@
     }
   }
 
-  const logEl = $('log');
-  function log(msg) {
-    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    logEl.textContent = (t + '  ' + msg + '\n' + logEl.textContent).slice(0, 4000);
-  }
-  window.addEventListener('error', e => log('page error: ' + e.message));
-
-  let room = '', retryTimer = null, connected = false, startedAt = 0;
-
+  // ---- connection to the OBS viewer (keeps retrying while live)
   function scheduleRetry(why) {
     if (!stream) return;
     connected = false;
@@ -137,7 +184,7 @@
       peer = new Peer({ debug: 1 });
       peer.on('error', e => {
         log('signal error: ' + e.type + (e.message ? ' (' + e.message + ')' : ''));
-        if (connected) return;   // a leftover error from an earlier attempt; we're already live
+        if (connected) return;   // leftover from an earlier attempt; already live
         if (e.type === 'peer-unavailable') scheduleRetry('OBS viewer not found for room ' + room + '. Is it open in OBS?');
         else scheduleRetry('Connection error.');
       });
@@ -164,7 +211,7 @@
     if (pc) pc.addEventListener('connectionstatechange', () => {
       if (call !== c) return;
       const st = pc.connectionState; log('link: ' + st);
-      if (st === 'connected') { connected = true; clearTimeout(retryTimer); setStatus('Live in OBS · room ' + room, 'live'); boostBitrate(pc); }
+      if (st === 'connected') { connected = true; clearTimeout(retryTimer); setStatus('Live in OBS · room ' + room, 'live'); tuneSenders(pc); }
       else if (st === 'failed') scheduleRetry('Connection to OBS failed.');
       else if (st === 'disconnected') {
         setStatus('Connection dropped, waiting…');
@@ -175,69 +222,136 @@
     c.on('error', e => { if (call === c) { log('call error: ' + e.message); scheduleRetry('Connection error.'); } });
   }
 
+  // ---- capture
+  const micConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const camConstraints = f => ({ facingMode: { ideal: f }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } });
+
+  async function captureCamera() {
+    try {
+      return await md.getUserMedia({ video: camConstraints(facing), audio: micEl.checked ? micConstraints : false });
+    } catch (e) {
+      if (micEl.checked && e && e.name !== 'NotAllowedError') {
+        log('camera+mic failed (' + e.name + '), trying camera only');
+        return await md.getUserMedia({ video: camConstraints(facing) });
+      }
+      throw e;
+    }
+  }
+
+  async function captureScreen() {
+    let screen;
+    try { screen = await md.getDisplayMedia({ video: true, audio: audioEl.checked }); }
+    catch (e1) {
+      if (!audioEl.checked || (e1 && e1.name === 'NotAllowedError')) throw e1;
+      log('phone refused its own sound (' + e1.name + '), trying video only');
+      screen = await md.getDisplayMedia({ video: true });
+    }
+    let mic = null;
+    if (micEl.checked) {
+      try { mic = await md.getUserMedia({ audio: micConstraints }); log('mic: on'); }
+      catch (e) { log('mic: blocked (' + e.name + '). Allow the microphone for this site in Safari.'); }
+    }
+    const sa = screen.getAudioTracks(), ma = mic ? mic.getAudioTracks() : [];
+    let audio = ma[0] || sa[0] || null;
+    if (sa.length && ma.length && audioCtx) {
+      try {
+        const dest = audioCtx.createMediaStreamDestination();
+        audioCtx.createMediaStreamSource(new MediaStream(sa)).connect(dest);
+        audioCtx.createMediaStreamSource(new MediaStream(ma)).connect(dest);
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        audio = dest.stream.getAudioTracks()[0];
+        extra = [...sa, ...ma];
+        log('audio: mixing phone sound + mic');
+      } catch (e) { log('mix failed, using mic only'); }
+    }
+    return new MediaStream([...screen.getVideoTracks(), ...(audio ? [audio] : [])]);
+  }
+
+  function watchTracks(s) {
+    s.getTracks().forEach(t => {
+      t.addEventListener('ended', () => {
+        log(t.kind + ' track ended by the phone');
+        if (t.kind === 'video' && stream && stream.getVideoTracks()[0] === t) cleanup(mode === 'camera' ? 'The camera was turned off.' : 'iPhone ended the screen share.', 'err');
+      });
+      t.addEventListener('mute', () => { log(t.kind + ' paused by the phone'); if (connected) setStatus((t.kind === 'video' ? 'Camera' : 'Mic') + ' paused by iOS. Bring this page back to the front.', 'err'); });
+      t.addEventListener('unmute', () => { log(t.kind + ' resumed'); if (connected) setStatus('Live in OBS · room ' + room, 'live'); });
+    });
+  }
+
+  function describe(s) {
+    const v = s.getVideoTracks()[0], a = s.getAudioTracks()[0];
+    const st = v && v.getSettings ? v.getSettings() : {};
+    log('video: ' + (st.width || '?') + '×' + (st.height || '?') + ' @' + Math.round(st.frameRate || 0) + 'fps' + (st.facingMode ? ' ' + st.facingMode : ''));
+    log(a ? 'audio: on (' + (a.label || 'microphone') + ')' : 'audio: NONE, nothing will be heard');
+  }
+
   goBtn.addEventListener('click', async () => {
     room = roomEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!room) { setStatus('Type the room code from OBS first.', 'err'); roomEl.focus(); return; }
     try { localStorage.setItem('ringocast-room', room); } catch (e) {}
     goBtn.disabled = true;
-    setStatus('Pick what to share…');
-
+    setStatus(mode === 'camera' ? 'Allow camera and microphone…' : 'Pick what to share…');
     startedAt = Date.now();
-    try { const AC = window.AudioContext || window.webkitAudioContext; if (micEl.checked && audioEl.checked && AC) audioCtx = new AC(); } catch (e) {}
-    let screen;
+    try { const AC = window.AudioContext || window.webkitAudioContext; if (mode === 'screen' && micEl.checked && audioEl.checked && AC) audioCtx = new AC(); } catch (e) {}
+
     try {
-      try {
-        screen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioEl.checked });
-      } catch (e1) {
-        if (!audioEl.checked || (e1 && e1.name === 'NotAllowedError')) throw e1;
-        log('phone refused its own sound (' + (e1 && e1.name) + '), trying video only');
-        screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      }
+      stream = mode === 'camera' ? await captureCamera() : await captureScreen();
     } catch (e) {
       log('capture failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
-      cleanup(e && e.name === 'NotAllowedError' ? 'Sharing was cancelled.' : 'Could not start screen sharing: ' + (e && e.message || e), 'err');
+      cleanup(e && e.name === 'NotAllowedError'
+        ? (mode === 'camera' ? 'Camera access was denied. Allow it in Safari: aA › Website Settings.' : 'Sharing was cancelled.')
+        : 'Could not start: ' + (e && e.message || e), 'err');
+      goBtn.disabled = false;
       return;
     }
-    stream = screen;
 
-    if (micEl.checked) {
-      try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } });
-        log('mic: on (' + (micStream.getAudioTracks()[0].label || 'microphone') + ')');
-      } catch (e) {
-        log('mic: blocked (' + (e && e.name) + '). Allow the microphone for this site in Safari.');
-      }
-    }
-
-    const screenAudio = screen.getAudioTracks();
-    const micAudio = micStream ? micStream.getAudioTracks() : [];
-    let audioTrack = null;
-    if (screenAudio.length && micAudio.length && audioCtx) {
-      try {
-        const dest = audioCtx.createMediaStreamDestination();
-        audioCtx.createMediaStreamSource(new MediaStream(screenAudio)).connect(dest);
-        audioCtx.createMediaStreamSource(new MediaStream(micAudio)).connect(dest);
-        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-        audioTrack = dest.stream.getAudioTracks()[0];
-        log('audio: mixing phone sound + mic');
-      } catch (e) { log('mix failed, using mic only'); audioTrack = micAudio[0]; }
-    } else {
-      audioTrack = micAudio[0] || screenAudio[0] || null;
-    }
-    stream = new MediaStream([...screen.getVideoTracks(), ...(audioTrack ? [audioTrack] : [])]);
-    screenStream = screen;
-
-    const vt = stream.getVideoTracks()[0];
-    log('capture started: ' + (vt ? vt.label || 'video' : 'no video track') + ' ' + JSON.stringify(vt && vt.getSettings ? (({width,height,frameRate}) => ({width,height,frameRate}))(vt.getSettings()) : {}));
-    log(!audioTrack ? 'audio: NONE, nothing will be heard' : screenAudio.length && !micAudio.length ? 'audio: phone sound' : !screenAudio.length && audioEl.checked ? 'audio: mic only (iPhone did not share its own sound)' : 'audio: ok');
-    stream.getTracks().forEach(t => {
-      t.addEventListener('ended', () => { log(t.kind + ' track ended by the phone'); if (t.kind === 'video') cleanup('iPhone ended the screen share.', 'err'); });
-      t.addEventListener('mute', () => log(t.kind + ' track paused by the phone'));
-      t.addEventListener('unmute', () => log(t.kind + ' track resumed'));
-    });
+    describe(stream);
+    watchTracks(stream);
     preview.srcObject = stream; preview.style.display = 'block';
-    goBtn.hidden = true; stopBtn.hidden = false;
+    preview.classList.toggle('mirror', mode === 'camera' && facing === 'user');
+    showLiveUI(true);
+    keepAwake();
     connect();
+  });
+
+  flipBtn.addEventListener('click', async () => {
+    if (!stream || mode !== 'camera') return;
+    flipBtn.disabled = true;
+    const next = facing === 'user' ? 'environment' : 'user';
+    const old = stream.getVideoTracks()[0];
+    try {
+      if (old) { stream.removeTrack(old); old.stop(); }   // iOS can't open both cameras at once
+      const s = await md.getUserMedia({ video: camConstraints(next) });
+      const nt = s.getVideoTracks()[0];
+      stream.addTrack(nt);
+      watchTracks(new MediaStream([nt]));
+      if (call && call.peerConnection) {
+        const snd = call.peerConnection.getSenders().find(x => x.track === old || (x.track && x.track.kind === 'video'));
+        if (snd) await snd.replaceTrack(nt);
+      }
+      facing = next;
+      preview.srcObject = stream;
+      preview.classList.toggle('mirror', facing === 'user');
+      describe(stream);
+    } catch (e) {
+      log('flip failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
+      try {   // put the previous camera back
+        const s = await md.getUserMedia({ video: camConstraints(facing) });
+        const nt = s.getVideoTracks()[0]; stream.addTrack(nt);
+        if (call && call.peerConnection) { const snd = call.peerConnection.getSenders().find(x => !x.track || x.track.kind === 'video'); if (snd) await snd.replaceTrack(nt); }
+        preview.srcObject = stream;
+      } catch (e2) { cleanup('Camera stopped.', 'err'); }
+    }
+    flipBtn.disabled = false;
+  });
+
+  muteBtn.addEventListener('click', () => {
+    const a = stream && stream.getAudioTracks()[0];
+    if (!a) { log('no mic to mute'); return; }
+    a.enabled = !a.enabled;
+    muteBtn.classList.toggle('on', !a.enabled);
+    muteBtn.textContent = a.enabled ? 'Mute mic' : 'Unmute mic';
+    log(a.enabled ? 'mic unmuted' : 'mic muted');
   });
 
   stopBtn.addEventListener('click', () => { log('stopped by you'); cleanup('Stopped'); });

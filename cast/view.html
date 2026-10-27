@@ -139,7 +139,7 @@
     dbg.hidden = false;
     setInterval(() => {
       const so = video.srcObject, at = so ? so.getAudioTracks() : [];
-      dbg.textContent = 'v5 | phone audio: ' + (so ? (at.length ? at.length + ' track ' + (at[0].muted ? '(silent from phone)' : at[0].readyState) : 'NONE sent') : 'not connected')
+      dbg.textContent = 'v6 | phone audio: ' + (so ? (at.length ? at.length + ' track ' + (at[0].muted ? '(silent from phone)' : at[0].readyState) : 'NONE sent') : 'not connected')
         + ' | player: ' + (video.muted ? 'MUTED (autoplay blocked)' : 'unmuted') + ' vol ' + video.volume
         + ' | ' + (window.obsstudio ? 'in OBS' : 'in browser');
     }, 500);
