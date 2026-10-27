@@ -73,6 +73,21 @@
   }
   function showLive() { card.style.display = 'none'; video.style.display = 'block'; }
 
+  // PeerJS fires 'stream' once per track (video, then audio), so play() can be
+  // interrupted (AbortError). Only a real autoplay refusal (NotAllowedError) mutes.
+  function startPlayback(s) {
+    video.muted = false;
+    const p = video.play();
+    if (!p) return;
+    p.then(() => { unmuteBtn.hidden = true; }).catch(e => {
+      if (e && e.name === 'NotAllowedError') {
+        video.muted = true; video.play().catch(() => {});
+        unmuteBtn.hidden = !s.getAudioTracks().length;
+      } else {
+        setTimeout(() => { if (video.srcObject === s && video.paused) startPlayback(s); }, 300);
+      }
+    });
+  }
   let peer = null, current = null, retryTimer = null, idTaken = false;
 
   function start() {
@@ -92,9 +107,8 @@
         const prev = current;
         current = call;
         if (prev && prev !== call) { try { prev.close(); } catch (e) {} }
-        video.srcObject = s;
-        video.muted = false;
-        video.play().then(() => unmuteBtn.hidden = true).catch(() => { video.muted = true; video.play(); unmuteBtn.hidden = !s.getAudioTracks().length; });
+        if (video.srcObject !== s) video.srcObject = s;
+        startPlayback(s);
         showLive();
       });
       const done = () => { if (current === call) { current = null; showIdle(); setState('Phone disconnected. Waiting for your phone…'); } };
