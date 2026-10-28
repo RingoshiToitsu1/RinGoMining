@@ -26,8 +26,8 @@
   .check input{width:20px;height:20px;accent-color:var(--orange)}
   button{width:100%;margin-top:14px;padding:16px;font-family:inherit;font-weight:700;font-size:17px;line-height:1;border:0;border-radius:10px;cursor:pointer}
   #go{background:var(--orange);color:#1e1915}
-  .ctl{display:flex;gap:8px;margin-top:14px}
-  .ctl button{margin:0;background:var(--card);color:var(--text);border:1px solid var(--line);font-size:15px;padding:14px 8px}
+  .ctl{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .ctl button{flex:1 1 calc(50% - 4px);margin:0;background:var(--card);color:var(--text);border:1px solid var(--line);font-size:15px;padding:14px 8px}
   .ctl button.on{background:var(--red);border-color:var(--red);color:#fff}
   button:disabled{opacity:.5}
   .status{margin-top:16px;padding:12px 14px;border-radius:10px;background:var(--card);border:1px solid var(--line);display:flex;gap:10px;align-items:center}
@@ -74,6 +74,7 @@
   <div id="live" hidden>
     <div id="tally">STANDBY</div>
     <div class="ctl">
+      <button id="srcBtn">Share screen</button>
       <button id="flip">Flip camera</button>
       <button id="muteBtn">Mute mic</button>
       <button id="stop">Stop</button>
@@ -96,7 +97,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
-  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), flipBtn = $('flip'), muteBtn = $('muteBtn');
+  const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), flipBtn = $('flip'), muteBtn = $('muteBtn'), srcBtn = $('srcBtn');
   const box = $('statusBox'), statusEl = $('status'), preview = $('preview'), logEl = $('log');
   const micEl = $('mic'), audioEl = $('audio');
   const PREFIX = 'ringocast-';
@@ -105,7 +106,7 @@
 
   let peer = null, call = null, stream = null, extra = [], audioCtx = null, wakeLock = null;
   let room = '', retryTimer = null, connected = false, startedAt = 0, callSeq = 0;
-  let mode = 'camera', facing = 'user', dataConn = null;
+  let mode = 'camera', source = 'camera', facing = 'user', dataConn = null, swapping = false;
   const nameEl = $('name'), tallyEl = $('tally');
   let device = '';
   try { device = localStorage.getItem('ringocast-device') || ''; } catch (e) {}
@@ -152,7 +153,13 @@
 
   function showLiveUI(on) {
     $('setup').hidden = on; $('live').hidden = !on; $('tips').hidden = on;
-    flipBtn.hidden = mode !== 'camera';
+    updateControls();
+  }
+  function updateControls() {
+    flipBtn.hidden = source !== 'camera';
+    srcBtn.hidden = source === 'camera' ? !canScreen : !canCamera;
+    srcBtn.textContent = source === 'camera' ? 'Share screen' : 'Back to camera';
+    preview.classList.toggle('mirror', source === 'camera' && facing === 'user');
   }
 
   function cleanup(msg, kind) {
@@ -298,7 +305,9 @@
     s.getTracks().forEach(t => {
       t.addEventListener('ended', () => {
         log(t.kind + ' track ended by the phone');
-        if (t.kind === 'video' && stream && stream.getVideoTracks()[0] === t) cleanup(mode === 'camera' ? 'The camera was turned off.' : 'iPhone ended the screen share.', 'err');
+        if (t.kind !== 'video' || !stream || stream.getVideoTracks()[0] !== t || swapping) return;
+        if (source === 'screen' && canCamera) { log('screen share ended, going back to the camera'); toCamera().catch(() => cleanup('The screen share ended.', 'err')); }
+        else cleanup(source === 'camera' ? 'The camera was turned off.' : 'iPhone ended the screen share.', 'err');
       });
       t.addEventListener('mute', () => { log(t.kind + ' paused by the phone'); if (connected) setStatus((t.kind === 'video' ? 'Camera' : 'Mic') + ' paused by iOS. Bring this page back to the front.', 'err'); });
       t.addEventListener('unmute', () => { log(t.kind + ' resumed'); if (connected) setStatus('Live in OBS · room ' + room, 'live'); });
@@ -332,44 +341,73 @@
       return;
     }
 
+    source = mode;
     describe(stream);
     watchTracks(stream);
     preview.srcObject = stream; preview.style.display = 'block';
-    preview.classList.toggle('mirror', mode === 'camera' && facing === 'user');
     showLiveUI(true);
     keepAwake();
     connect();
   });
 
-  flipBtn.addEventListener('click', async () => {
-    if (!stream || mode !== 'camera') return;
-    flipBtn.disabled = true;
-    const next = facing === 'user' ? 'environment' : 'user';
-    const old = stream.getVideoTracks()[0];
+  // ---- swap the outgoing picture without dropping the stream (camera <-> screen, front <-> back)
+  function videoSender() {
+    const pc = call && call.peerConnection;
+    return pc ? pc.getSenders().find(x => x.track && x.track.kind === 'video') : null;
+  }
+  // stopFirst: iOS can't run both cameras at once, so the old camera must stop before the other opens.
+  async function swapVideo(acquire, stopFirst) {
+    swapping = true;
     try {
-      if (old) { stream.removeTrack(old); old.stop(); }   // iOS can't open both cameras at once
-      const s = await md.getUserMedia({ video: camConstraints(next) });
-      const nt = s.getVideoTracks()[0];
+      const old = stream.getVideoTracks()[0];
+      const snd = videoSender();
+      if (stopFirst && old) { stream.removeTrack(old); old.stop(); }
+      const nt = (await acquire()).getVideoTracks()[0];
+      if (!nt) throw new Error('no video');
+      if (!stopFirst && old) stream.removeTrack(old);
       stream.addTrack(nt);
       watchTracks(new MediaStream([nt]));
-      if (call && call.peerConnection) {
-        const snd = call.peerConnection.getSenders().find(x => x.track === old || (x.track && x.track.kind === 'video'));
-        if (snd) await snd.replaceTrack(nt);
-      }
-      facing = next;
+      if (snd) await snd.replaceTrack(nt);
+      if (!stopFirst && old) old.stop();
       preview.srcObject = stream;
-      preview.classList.toggle('mirror', facing === 'user');
       describe(stream);
+    } finally { swapping = false; }
+  }
+  async function toCamera(f) {
+    const want = f || facing;
+    await swapVideo(() => md.getUserMedia({ video: camConstraints(want) }), source === 'camera');
+    facing = want; source = 'camera';
+    updateControls();
+  }
+  async function rescueCamera() {
+    if (stream && stream.getVideoTracks().length) return;
+    try { await toCamera(); } catch (e) { cleanup('Camera stopped.', 'err'); }
+  }
+
+  flipBtn.addEventListener('click', async () => {
+    if (!stream || source !== 'camera') return;
+    flipBtn.disabled = srcBtn.disabled = true;
+    try { await toCamera(facing === 'user' ? 'environment' : 'user'); log('camera flipped'); }
+    catch (e) { log('flip failed: ' + (e && e.name) + ' ' + (e && e.message || '')); await rescueCamera(); }
+    flipBtn.disabled = srcBtn.disabled = false;
+  });
+
+  srcBtn.addEventListener('click', async () => {
+    if (!stream) return;
+    flipBtn.disabled = srcBtn.disabled = true;
+    try {
+      if (source === 'camera') {
+        await swapVideo(() => md.getDisplayMedia({ video: true }), false);   // call straight from the tap: iOS needs the gesture
+        source = 'screen'; updateControls(); log('switched to screen');
+      } else {
+        await toCamera(); log('switched to camera');
+      }
     } catch (e) {
-      log('flip failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
-      try {   // put the previous camera back
-        const s = await md.getUserMedia({ video: camConstraints(facing) });
-        const nt = s.getVideoTracks()[0]; stream.addTrack(nt);
-        if (call && call.peerConnection) { const snd = call.peerConnection.getSenders().find(x => !x.track || x.track.kind === 'video'); if (snd) await snd.replaceTrack(nt); }
-        preview.srcObject = stream;
-      } catch (e2) { cleanup('Camera stopped.', 'err'); }
+      log('switch failed: ' + (e && e.name) + ' ' + (e && e.message || ''));
+      if (e && e.name === 'NotAllowedError' && source === 'camera') setStatus('Screen sharing was cancelled. Still on camera.');
+      await rescueCamera();
     }
-    flipBtn.disabled = false;
+    flipBtn.disabled = srcBtn.disabled = false;
   });
 
   muteBtn.addEventListener('click', () => {
