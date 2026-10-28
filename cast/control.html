@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ringo Cast Control</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0907">
+<link rel="icon" href="../favicon.ico">
+<style>
+  :root{--bg:#0b0907;--card:#16130f;--line:#2a241d;--text:#f2ebe3;--muted:#a89a8b;--orange:#f0803c;--red:#e5534b;--green:#4cc38a}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--line)}
+  h1{font-size:18px;margin:0;letter-spacing:.02em} h1 span{color:var(--orange)}
+  .room{font:700 15px ui-monospace,Menlo,monospace;letter-spacing:.12em;color:var(--orange);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 10px}
+  .conn{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .ok .dot{background:var(--green)} .bad .dot{background:var(--red)}
+  main{padding:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  .tile{position:relative;background:#000;border:3px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;aspect-ratio:16/9;padding:0;color:inherit;font:inherit;text-align:left;width:100%}
+  .tile:hover{border-color:#5a4d40}
+  .tile:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  .tile video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+  .tile .bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+  .key{font:700 12px ui-monospace,Menlo,monospace;background:rgba(255,255,255,.14);border-radius:5px;padding:2px 6px}
+  .name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{margin-left:auto;font:800 11px/1 inherit;letter-spacing:.1em;padding:5px 7px;border-radius:5px;background:var(--red);color:#fff;display:none}
+  .tile.live{border-color:var(--red)}
+  .tile.live .badge{display:inline-block}
+  .empty{color:var(--muted);text-align:center;padding:48px 16px;border:1px dashed var(--line);border-radius:12px}
+  .empty b{color:var(--text)}
+  .hint{color:var(--muted);font-size:13px;margin-top:14px}
+  .ask{max-width:360px;margin:48px auto;text-align:center}
+  .ask input{width:100%;padding:14px;font:600 22px/1 ui-monospace,Menlo,monospace;letter-spacing:.15em;text-transform:uppercase;text-align:center;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px}
+  .ask button{width:100%;margin-top:12px;padding:14px;border:0;border-radius:10px;background:var(--orange);color:#1e1915;font:700 16px inherit;cursor:pointer}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>RINGO<span>CAST</span> · Control</h1>
+  <span class="room" id="roomLbl"></span>
+  <span class="conn" id="conn"><span class="dot"></span><span id="connTxt">Connecting…</span></span>
+</header>
+<main>
+  <form class="ask" id="ask" hidden>
+    <p>Enter the room code shown on your OBS output.</p>
+    <input id="roomIn" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
+    <button>Open control</button>
+  </form>
+  <div id="panel" hidden>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty">No phones connected yet. On each phone, open <b>ringomining.com/cast</b> and enter room <b id="emptyRoom"></b>.</div>
+    <p class="hint">Click a phone, or press its number key, to put it on air. Audio follows the phone that's on air.</p>
+  </div>
+</main>
+
+<script src="lib/peerjs.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const PREFIX = 'ringocast-';
+  const params = new URLSearchParams(location.search);
+  let room = (params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  if (!room) {
+    $('ask').hidden = false; $('conn').hidden = true;
+    $('ask').addEventListener('submit', e => {
+      e.preventDefault();
+      const r = $('roomIn').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (r) location.search = '?room=' + r;
+    });
+    return;
+  }
+  $('roomLbl').textContent = room; $('emptyRoom').textContent = room;
+  $('panel').hidden = false;
+
+  const grid = $('grid'), empty = $('empty');
+  let peer = null, conn = null, retry = null, state = { cams: [], featured: null };
+  const streams = new Map();   // cam id -> MediaStream
+  const tiles = new Map();     // cam id -> { el, video }
+
+  function setConn(text, kind) { $('connTxt').textContent = text; $('conn').className = 'conn' + (kind ? ' ' + kind : ''); }
+
+  function render() {
+    const ids = new Set(state.cams.map(c => c.id));
+    for (const [id, t] of tiles) if (!ids.has(id)) { t.video.srcObject = null; t.el.remove(); tiles.delete(id); }
+    state.cams.forEach((c, i) => {
+      let t = tiles.get(c.id);
+      if (!t) {
+        const el = document.createElement('button');
+        el.className = 'tile'; el.type = 'button';
+        el.innerHTML = '<video muted autoplay playsinline></video><div class="bar"><span class="key"></span><span class="name"></span><span class="badge">ON AIR</span></div>';
+        el.addEventListener('click', () => pick(c.id));
+        t = { el, video: el.querySelector('video') };
+        tiles.set(c.id, t);
+      }
+      grid.appendChild(t.el);   // keeps order
+      t.el.querySelector('.key').textContent = i < 9 ? String(i + 1) : '';
+      t.el.querySelector('.name').textContent = c.name;
+      t.el.classList.toggle('live', c.id === state.featured);
+      t.el.setAttribute('aria-pressed', String(c.id === state.featured));
+      const s = streams.get(c.id);
+      if (s && t.video.srcObject !== s) { t.video.srcObject = s; t.video.play().catch(() => {}); }
+    });
+    empty.hidden = state.cams.length > 0;
+  }
+
+  function pick(id) {
+    if (!conn || !conn.open) return;
+    state.featured = id; render();          // instant feedback; output confirms
+    conn.send({ type: 'feature', id });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= 9 && state.cams[n - 1]) pick(state.cams[n - 1].id);
+  });
+
+  function connect() {
+    clearTimeout(retry);
+    if (!peer || peer.destroyed) {
+      peer = new Peer({ debug: 1 });
+      peer.on('call', call => {
+        const id = (call.metadata || {}).cam;
+        call.answer();
+        call.on('stream', s => { streams.set(id, s); render(); });
+        call.on('close', () => { if (streams.get(id) && call.remoteStream === streams.get(id)) streams.delete(id); });
+      });
+      peer.on('error', e => {
+        if (e.type === 'peer-unavailable') { setConn('OBS output for room ' + room + ' is not open', 'bad'); later(); }
+        else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) { setConn('Connection server lost, retrying…', 'bad'); try { peer.destroy(); } catch (x) {} later(); }
+      });
+      peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
+      peer.on('open', openConn);
+    } else if (peer.open) openConn();
+  }
+  function later() { clearTimeout(retry); retry = setTimeout(connect, 3000); }
+
+  function openConn() {
+    if (conn) { try { conn.close(); } catch (e) {} }
+    const c = peer.connect(PREFIX + room, { metadata: { role: 'director' }, reliable: true });
+    conn = c;
+    c.on('open', () => setConn('Connected to OBS output', 'ok'));
+    c.on('data', msg => {
+      if (!msg || msg.type !== 'state') return;
+      state = { cams: msg.cams || [], featured: msg.featured };
+      render();
+    });
+    const lost = () => { if (conn !== c) return; setConn('Lost the OBS output, reconnecting…', 'bad'); state = { cams: [], featured: null }; streams.clear(); render(); later(); };
+    c.on('close', lost); c.on('error', lost);
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>

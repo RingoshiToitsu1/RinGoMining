@@ -40,6 +40,10 @@
   #log:empty{display:none}
   .tips{margin-top:22px;color:var(--muted);font-size:14px;padding-left:20px}
   .tips li{margin-bottom:6px}
+  #name{width:100%;padding:12px 14px;font:600 17px/1.2 inherit;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px}
+  #name:focus{outline:2px solid var(--orange);border-color:transparent}
+  #tally{margin-top:14px;padding:14px;border-radius:10px;text-align:center;font-weight:800;letter-spacing:.12em;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+  #tally.on{background:var(--red);border-color:var(--red);color:#fff}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -51,6 +55,9 @@
   <div id="setup">
     <label class="lbl" for="room">Room code (shown in OBS)</label>
     <input id="room" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123">
+
+    <label class="lbl" for="name">This phone's name (shown on the control page)</label>
+    <input id="name" maxlength="24" autocomplete="off" placeholder="Phone A">
 
     <span class="lbl">Send</span>
     <div class="seg" id="mode">
@@ -65,6 +72,7 @@
   </div>
 
   <div id="live" hidden>
+    <div id="tally">STANDBY</div>
     <div class="ctl">
       <button id="flip">Flip camera</button>
       <button id="muteBtn">Mute mic</button>
@@ -77,7 +85,7 @@
   <pre id="log"></pre>
 
   <ul class="tips" id="tips">
-    <li>Open the viewer link in OBS first, then tap Go live here.</li>
+    <li>Open the output link in OBS first, then tap Go live here. Any number of phones can join the same room.</li>
     <li>Keep this page open on the phone. If you switch apps or lock the phone, iOS pauses the camera.</li>
     <li>Same Wi-Fi as the computer gives the best quality. Plug the phone in for long streams.</li>
   </ul>
@@ -87,6 +95,7 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
   const roomEl = $('room'), goBtn = $('go'), stopBtn = $('stop'), flipBtn = $('flip'), muteBtn = $('muteBtn');
   const box = $('statusBox'), statusEl = $('status'), preview = $('preview'), logEl = $('log');
   const micEl = $('mic'), audioEl = $('audio');
@@ -96,9 +105,16 @@
 
   let peer = null, call = null, stream = null, extra = [], audioCtx = null, wakeLock = null;
   let room = '', retryTimer = null, connected = false, startedAt = 0, callSeq = 0;
-  let mode = 'camera', facing = 'user';
+  let mode = 'camera', facing = 'user', dataConn = null;
+  const nameEl = $('name'), tallyEl = $('tally');
+  let device = '';
+  try { device = localStorage.getItem('ringocast-device') || ''; } catch (e) {}
+  if (!device) { device = 'd' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join(''); try { localStorage.setItem('ringocast-device', device); } catch (e) {} }
+  let savedName = ''; try { savedName = localStorage.getItem('ringocast-name') || ''; } catch (e) {}
+  nameEl.value = params.get('name') || savedName;
+  const camName = () => nameEl.value.trim().slice(0, 24) || 'Phone ' + device.slice(-3).toUpperCase();
+  function setTally(on) { tallyEl.textContent = on ? 'ON AIR' : 'STANDBY'; tallyEl.className = on ? 'on' : ''; }
 
-  const params = new URLSearchParams(location.search);
   let saved = ''; try { saved = localStorage.getItem('ringocast-room') || ''; } catch (e) {}
   roomEl.value = (params.get('room') || saved).toUpperCase();
 
@@ -142,6 +158,8 @@
   function cleanup(msg, kind) {
     clearTimeout(retryTimer);
     if (call) { const c = call; call = null; try { c.close(); } catch (e) {} }
+    if (dataConn) { try { dataConn.close(); } catch (e) {} dataConn = null; }
+    setTally(false);
     if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     extra.forEach(t => t.stop()); extra = [];
@@ -197,6 +215,14 @@
     });
   }
 
+  function openTally() {
+    if (dataConn) { try { dataConn.close(); } catch (e) {} }
+    const dc = peer.connect(PREFIX + room, { metadata: { role: 'phone', device, name: camName() }, reliable: true });
+    dataConn = dc;
+    dc.on('data', msg => { if (dataConn === dc && msg && msg.type === 'tally') setTally(!!msg.live); });
+    dc.on('close', () => { if (dataConn === dc) setTally(false); });
+  }
+
   async function connect() {
     if (!stream) return;
     setStatus('Connecting to OBS…');
@@ -204,14 +230,15 @@
     if (!stream) return;
     if (call) { const old = call; call = null; try { old.close(); } catch (e) {} }
     log('calling room ' + room);
-    const c = peer.call(PREFIX + room, stream, { metadata: { seq: ++callSeq, started: startedAt } });
+    const c = peer.call(PREFIX + room, stream, { metadata: { seq: ++callSeq, started: startedAt, device, name: camName() } });
+    openTally();
     if (!c) return scheduleRetry('Could not call OBS.');
     call = c;
     const pc = c.peerConnection;
     if (pc) pc.addEventListener('connectionstatechange', () => {
       if (call !== c) return;
       const st = pc.connectionState; log('link: ' + st);
-      if (st === 'connected') { connected = true; clearTimeout(retryTimer); setStatus('Live in OBS · room ' + room, 'live'); tuneSenders(pc); }
+      if (st === 'connected') { connected = true; clearTimeout(retryTimer); setStatus('Live · ' + camName() + ' · room ' + room, 'live'); tuneSenders(pc); }
       else if (st === 'failed') scheduleRetry('Connection to OBS failed.');
       else if (st === 'disconnected') {
         setStatus('Connection dropped, waiting…');
@@ -288,7 +315,7 @@
   goBtn.addEventListener('click', async () => {
     room = roomEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!room) { setStatus('Type the room code from OBS first.', 'err'); roomEl.focus(); return; }
-    try { localStorage.setItem('ringocast-room', room); } catch (e) {}
+    try { localStorage.setItem('ringocast-room', room); localStorage.setItem('ringocast-name', nameEl.value.trim()); } catch (e) {}
     goBtn.disabled = true;
     setStatus(mode === 'camera' ? 'Allow camera and microphone…' : 'Pick what to share…');
     startedAt = Date.now();

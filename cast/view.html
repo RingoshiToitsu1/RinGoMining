@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ringo Cast Viewer</title>
+<title>Ringo Cast Output</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="../favicon.ico">
 <style>
@@ -11,29 +11,34 @@
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;overflow:hidden;background:transparent;color:var(--text);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   body.page{background:#0b0907}
-  video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;display:none}
-  .card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center}
+  #feeds video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .25s ease}
+  #feeds video.on{opacity:1}
+  .card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(460px,calc(100% - 32px));background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center}
   h1{font-size:22px;margin:0 0 4px;letter-spacing:.02em} h1 span{color:var(--orange)}
   .code{font:700 44px/1.1 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:var(--orange);margin:10px 0 6px}
   .muted{color:var(--muted);font-size:14px;margin:0}
   #qr{background:#fff;border-radius:10px;padding:10px;display:inline-block;margin:16px 0 10px;line-height:0}
-  #qr img{width:180px;height:180px;image-rendering:pixelated}
-  .url{font:12px ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all;margin:8px 0 0}
-  .state{margin-top:14px;font-size:14px}
+  #qr img{width:170px;height:170px;image-rendering:pixelated}
+  .url{font:12px ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all;margin:4px 0 10px}
+  .state{margin-top:10px;font-size:14px}
   .err{color:var(--red)}
+  #dbg{position:fixed;left:12px;top:12px;z-index:6;padding:8px 12px;border-radius:8px;background:rgba(0,0,0,.75);color:#fff;font:600 16px/1.4 ui-monospace,Menlo,monospace}
+  #unmute{position:fixed;right:16px;bottom:16px;z-index:5;padding:12px 16px;border:0;border-radius:10px;background:var(--orange);color:#1e1915;font:700 15px/1 inherit;cursor:pointer}
 </style>
 </head>
 <body>
-<video id="v" autoplay playsinline muted></video>
-<div id="dbg" hidden style="position:fixed;left:12px;top:12px;z-index:6;padding:8px 12px;border-radius:8px;background:rgba(0,0,0,.75);color:#fff;font:600 16px/1.4 ui-monospace,Menlo,monospace"></div>
-<button id="unmute" hidden style="position:fixed;right:16px;bottom:16px;z-index:5;padding:12px 16px;border:0;border-radius:10px;background:#f0803c;color:#1e1915;font:700 15px/1 inherit;cursor:pointer">Click to hear audio</button>
+<div id="feeds"></div>
+<div id="dbg" hidden></div>
+<button id="unmute" hidden>Click to hear audio</button>
 <div class="card" id="card">
-  <h1>RINGO<span>CAST</span> · OBS viewer</h1>
+  <h1>RINGO<span>CAST</span> · Output</h1>
   <div class="code" id="code">······</div>
-  <p class="muted">Scan with your phone, or open <b>ringomining.com/cast</b> and type the code.</p>
+  <p class="muted">Phones: scan this, or open <b>ringomining.com/cast</b> and type the code. Connect as many as you like.</p>
   <div id="qr"></div>
-  <p class="muted">Add this exact URL as an OBS Browser Source:</p>
+  <p class="muted">OBS Browser Source URL:</p>
   <p class="url" id="obsUrl"></p>
+  <p class="muted">Pick the featured phone from the control page:</p>
+  <p class="url" id="ctlUrl"></p>
   <p class="state" id="state">Starting…</p>
 </div>
 
@@ -42,12 +47,11 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const video = $('v'), unmuteBtn = $('unmute'), card = $('card'), stateEl = $('state');
+  const feeds = $('feeds'), unmuteBtn = $('unmute'), card = $('card'), stateEl = $('state');
   const PREFIX = 'ringocast-';
   const params = new URLSearchParams(location.search);
   const clean = params.has('clean');
-  const inOBS = !!window.obsstudio;
-  if (!inOBS) document.body.classList.add('page');
+  if (!window.obsstudio) document.body.classList.add('page');
 
   let room = (params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!room) {
@@ -56,68 +60,162 @@
     params.set('room', room);
     history.replaceState(null, '', location.pathname + '?' + params.toString());
   }
-
-  const base = location.origin + location.pathname.replace(/view\.html$/, '');
-  const senderUrl = base + '?room=' + room;
+  const dir = location.origin + location.pathname.replace(/[^/]*$/, '');
+  const senderUrl = dir + '?room=' + room;
   $('code').textContent = room;
   $('obsUrl').textContent = location.origin + location.pathname + '?room=' + room;
-  try {
-    const qr = qrcode(0, 'M'); qr.addData(senderUrl); qr.make();
-    $('qr').innerHTML = qr.createImgTag(6, 0);
-  } catch (e) { $('qr').style.display = 'none'; }
+  $('ctlUrl').textContent = dir + 'control.html?room=' + room;
+  try { const qr = qrcode(0, 'M'); qr.addData(senderUrl); qr.make(); $('qr').innerHTML = qr.createImgTag(6, 0); }
+  catch (e) { $('qr').style.display = 'none'; }
 
   function setState(t, bad) { stateEl.textContent = t; stateEl.className = 'state' + (bad ? ' err' : ''); }
-  function showIdle() {
-    video.style.display = 'none'; video.srcObject = null; unmuteBtn.hidden = true;
-    card.style.display = clean ? 'none' : 'block';
-  }
-  function showLive() { card.style.display = 'none'; video.style.display = 'block'; }
 
-  // PeerJS fires 'stream' once per track (video, then audio), so play() can be
-  // interrupted (AbortError). Only a real autoplay refusal (NotAllowedError) mutes.
-  function startPlayback(s) {
-    video.muted = false;
-    const p = video.play();
-    if (!p) return;
-    p.then(() => { unmuteBtn.hidden = true; }).catch(e => {
-      if (e && e.name === 'NotAllowedError') {
-        video.muted = true; video.play().catch(() => {});
-        unmuteBtn.hidden = !s.getAudioTracks().length;
-      } else {
-        setTimeout(() => { if (video.srcObject === s && video.paused) startPlayback(s); }, 300);
-      }
+  // ---------- cameras ----------
+  // id -> { id, name, call, stream, video, best:[started,seq], since }
+  const cams = new Map();
+  const phoneConns = new Map();      // device id -> data connection (for the ON AIR light)
+  const directors = new Set();       // { conn, calls: Map camId -> MediaConnection }
+  let featured = null;               // cam id on screen
+  let preferred = null;              // last cam the operator picked (re-featured when it comes back)
+  let audioBlocked = false;
+
+  const rank = c => { const m = (c && c.metadata) || {}; return [m.started || 0, m.seq || 0]; };
+  const older = (x, y) => x[0] < y[0] || (x[0] === y[0] && x[1] < y[1]);
+  const liveCams = () => [...cams.values()].filter(c => c.stream);
+
+  function render() {
+    for (const c of cams.values()) {
+      if (!c.video) continue;
+      const on = c.id === featured;
+      c.video.classList.toggle('on', on);
+      c.video.volume = on ? 1 : 0;   // audio follows the featured phone
+    }
+    const anyLive = liveCams().length > 0;
+    card.style.display = (!anyLive && !clean) ? 'block' : 'none';
+    if (!anyLive) setState('Waiting for phones…');
+  }
+
+  function feature(id, byOperator) {
+    if (byOperator) preferred = id;
+    if (id && !(cams.get(id) || {}).stream) return;
+    featured = id;
+    render();
+    sendTally();
+    broadcastState();
+  }
+
+  function fallback() {
+    const live = liveCams().sort((a, b) => b.since - a.since);
+    feature(live.length ? live[0].id : null);
+  }
+
+  function play(v) {
+    v.muted = false;
+    const p = v.play();
+    if (p) p.catch(e => {
+      if (e && e.name === 'NotAllowedError') { v.muted = true; v.play().catch(() => {}); audioBlocked = true; unmuteBtn.hidden = false; }
+      else setTimeout(() => { if (v.srcObject && v.paused) play(v); }, 300);
     });
   }
-  let peer = null, current = null, retryTimer = null, idTaken = false;
 
+  function attach(cam, stream) {
+    cam.stream = stream;
+    if (!cam.video) {
+      cam.video = document.createElement('video');
+      cam.video.autoplay = true; cam.video.playsInline = true;
+      feeds.appendChild(cam.video);
+    }
+    if (cam.video.srcObject !== stream) cam.video.srcObject = stream;
+    play(cam.video);
+  }
+
+  function dropCam(cam) {
+    if (cam.video) { cam.video.srcObject = null; cam.video.remove(); cam.video = null; }
+    cam.stream = null; cam.call = null;
+    for (const d of directors) { const fc = d.calls.get(cam.id); if (fc) { try { fc.close(); } catch (e) {} d.calls.delete(cam.id); } }
+    if (featured === cam.id) fallback(); else { render(); broadcastState(); }
+  }
+
+  function onPhoneCall(call) {
+    const m = call.metadata || {};
+    const id = m.device || call.peer;
+    let cam = cams.get(id);
+    if (!cam) { cam = { id, name: m.name || 'Phone', best: [0, 0], first: Date.now() }; cams.set(id, cam); }
+    const r = rank(call);
+    if (older(r, cam.best)) { try { call.close(); } catch (e) {} return; }   // stale offer from before a reconnect
+    cam.best = r;
+    if (m.name) cam.name = m.name;
+    call.answer();
+    call.on('stream', s => {
+      if (older(rank(call), cam.best)) return;
+      const prev = cam.call;
+      cam.call = call;
+      if (prev && prev !== call) { try { prev.close(); } catch (e) {} }
+      const fresh = cam.stream !== s;
+      if (!cam.stream) cam.since = Date.now();
+      attach(cam, s);
+      if (!featured || !(cams.get(featured) || {}).stream || preferred === id) feature(id);
+      else { render(); broadcastState(); sendTally(); }
+      if (fresh) forwardToDirectors(cam);
+    });
+    const done = () => { if (cam.call === call) dropCam(cam); };
+    call.on('close', done);
+    call.on('error', done);
+    if (call.peerConnection) call.peerConnection.addEventListener('connectionstatechange', () => {
+      if (['failed', 'closed'].includes(call.peerConnection.connectionState)) done();
+    });
+  }
+
+  // ---------- control pages + phone tally ----------
+  function stateMsg() {
+    return { type: 'state', room, featured, cams: [...cams.values()].filter(c => c.stream).sort((a, b) => a.first - b.first).map(c => ({ id: c.id, name: c.name })) };
+  }
+  function broadcastState() { const msg = stateMsg(); for (const d of directors) if (d.conn.open) d.conn.send(msg); }
+  function sendTally() {
+    for (const [dev, conn] of phoneConns) if (conn.open) conn.send({ type: 'tally', live: dev === featured, name: (cams.get(dev) || {}).name });
+  }
+  function forwardToDirectors(cam, only) {
+    for (const d of (only ? [only] : directors)) {
+      const old = d.calls.get(cam.id);
+      if (old) { try { old.close(); } catch (e) {} }
+      if (!cam.stream) continue;
+      const fc = peer.call(d.conn.peer, cam.stream, { metadata: { cam: cam.id } });
+      if (fc) d.calls.set(cam.id, fc);
+    }
+  }
+
+  function onData(conn) {
+    const m = conn.metadata || {};
+    if (m.role === 'director') {
+      const d = { conn, calls: new Map() };
+      directors.add(d);
+      conn.on('open', () => { conn.send(stateMsg()); for (const c of liveCams()) forwardToDirectors(c, d); });
+      conn.on('data', msg => {
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'feature' && typeof msg.id === 'string') feature(msg.id, true);
+        if (msg.type === 'refresh') { conn.send(stateMsg()); for (const c of liveCams()) forwardToDirectors(c, d); }
+      });
+      const bye = () => { directors.delete(d); for (const fc of d.calls.values()) { try { fc.close(); } catch (e) {} } };
+      conn.on('close', bye); conn.on('error', bye);
+    } else if (m.role === 'phone' && m.device) {
+      const prev = phoneConns.get(m.device);
+      if (prev && prev !== conn) { try { prev.close(); } catch (e) {} }
+      phoneConns.set(m.device, conn);
+      conn.on('open', () => conn.send({ type: 'tally', live: m.device === featured }));
+      conn.on('close', () => { if (phoneConns.get(m.device) === conn) phoneConns.delete(m.device); });
+    } else {
+      conn.close();
+    }
+  }
+
+  // ---------- signaling ----------
+  let peer = null, retryTimer = null, idTaken = false;
   function start() {
     idTaken = false;
     peer = new Peer(PREFIX + room, { debug: 1 });
-    peer.on('open', () => setState('Waiting for your phone…'));
-    const rank = c => { const m = (c && c.metadata) || {}; return [m.started || 0, m.seq || 0]; };
-    const older = (x, y) => x[0] < y[0] || (x[0] === y[0] && x[1] < y[1]);
-    let best = [0, 0];
-    peer.on('call', call => {
-      const r = rank(call);
-      if (older(r, best)) { try { call.close(); } catch (e) {} return; }   // stale offer from before a reconnect
-      best = r;
-      call.answer();
-      call.on('stream', s => {
-        if (older(rank(call), best)) return;
-        const prev = current;
-        current = call;
-        if (prev && prev !== call) { try { prev.close(); } catch (e) {} }
-        if (video.srcObject !== s) video.srcObject = s;
-        startPlayback(s);
-        showLive();
-      });
-      const done = () => { if (current === call) { current = null; showIdle(); setState('Phone disconnected. Waiting for your phone…'); } };
-      call.on('close', done);
-      call.on('error', done);
-      if (call.peerConnection) call.peerConnection.addEventListener('connectionstatechange', () => {
-        if (['failed', 'closed'].includes(call.peerConnection.connectionState)) done();
-      });
-    });
+    peer.on('open', () => render());
+    peer.on('call', onPhoneCall);
+    peer.on('connection', onData);
     peer.on('disconnected', () => { if (idTaken || peer.destroyed) return; setState('Reconnecting…'); try { peer.reconnect(); } catch (e) {} });
     peer.on('error', e => {
       if (e.type === 'unavailable-id') {
@@ -128,24 +226,28 @@
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) {
         setState('Lost the connection server, retrying…', true);
         clearTimeout(retryTimer); retryTimer = setTimeout(() => { try { peer.destroy(); } catch (x) {} start(); }, 5000);
-      } else {
+      } else if (e.type !== 'peer-unavailable') {
         setState('Error: ' + (e.message || e.type), true);
       }
     });
   }
 
-  const dbg = $('dbg'), debug = params.has('debug');
-  if (debug) {
+  const dbg = $('dbg');
+  if (params.has('debug')) {
     dbg.hidden = false;
     setInterval(() => {
-      const so = video.srcObject, at = so ? so.getAudioTracks() : [];
-      dbg.textContent = 'v6 | phone audio: ' + (so ? (at.length ? at.length + ' track ' + (at[0].muted ? '(silent from phone)' : at[0].readyState) : 'NONE sent') : 'not connected')
-        + ' | player: ' + (video.muted ? 'MUTED (autoplay blocked)' : 'unmuted') + ' vol ' + video.volume
+      const f = cams.get(featured), s = f && f.stream, at = s ? s.getAudioTracks() : [];
+      dbg.textContent = 'v7 | phones: ' + liveCams().length + ' | on air: ' + (f ? f.name : 'none')
+        + ' | audio: ' + (s ? (at.length ? (at[0].muted ? 'silent from phone' : 'live') : 'NONE sent') : '-')
+        + ' | ' + (audioBlocked ? 'MUTED (autoplay blocked)' : 'unmuted')
         + ' | ' + (window.obsstudio ? 'in OBS' : 'in browser');
     }, 500);
   }
-  unmuteBtn.addEventListener('click', () => { video.muted = false; video.play(); unmuteBtn.hidden = true; });
-  showIdle();
+  unmuteBtn.addEventListener('click', () => {
+    audioBlocked = false; unmuteBtn.hidden = true;
+    for (const c of cams.values()) if (c.video) { c.video.muted = false; c.video.play().catch(() => {}); }
+  });
+  render();
   start();
 })();
 </script>
