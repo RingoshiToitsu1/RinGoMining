@@ -160,8 +160,20 @@
   listDevices();
   const nameEl = $('name'), tallyEl = $('tally');
   let device = '';
-  try { device = localStorage.getItem('ringocast-device') || ''; } catch (e) {}
-  if (!device) { device = 'd' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join(''); try { localStorage.setItem('ringocast-device', device); } catch (e) {} }
+  // One id per tab, so several tabs on one computer (one per capture card) count as separate cameras.
+  const newId = () => 'd' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('');
+  try { device = sessionStorage.getItem('ringocast-device') || ''; } catch (e) {}
+  if (!device) device = newId();
+  try { sessionStorage.setItem('ringocast-device', device); } catch (e) {}
+  try {   // a duplicated tab copies sessionStorage, so ask other tabs whether this id is already in use
+    const ch = new BroadcastChannel('ringocast-tabs');
+    ch.onmessage = ev => {
+      const m = ev.data || {};
+      if (m.type === 'hello' && m.device === device) ch.postMessage({ type: 'taken', device });
+      if (m.type === 'taken' && m.device === device && !stream) { device = newId(); try { sessionStorage.setItem('ringocast-device', device); } catch (e) {} }
+    };
+    ch.postMessage({ type: 'hello', device });
+  } catch (e) {}
   let savedName = ''; try { savedName = localStorage.getItem('ringocast-name') || ''; } catch (e) {}
   nameEl.value = params.get('name') || savedName;
   const camName = () => nameEl.value.trim().slice(0, 24) || 'Phone ' + device.slice(-3).toUpperCase();
