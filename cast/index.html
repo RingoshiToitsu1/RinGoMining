@@ -44,6 +44,10 @@
   #name:focus{outline:2px solid var(--orange);border-color:transparent}
   #tally{margin-top:14px;padding:14px;border-radius:10px;text-align:center;font-weight:800;letter-spacing:.12em;background:var(--card);border:1px solid var(--line);color:var(--muted)}
   #tally.on{background:var(--red);border-color:var(--red);color:#fff}
+  select{width:100%;padding:12px 14px;font:600 16px/1.2 inherit;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;-webkit-appearance:none;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat}
+  select:focus{outline:2px solid var(--orange);border-color:transparent}
+  #live #camRow{margin-top:4px}
+  .hint{color:var(--muted);font-size:13px;margin:6px 0 0}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -65,10 +69,23 @@
       <button type="button" data-mode="screen" aria-pressed="false">Screen</button>
     </div>
 
-    <label class="check"><input type="checkbox" id="mic" checked> Microphone</label>
+    <label class="check"><input type="checkbox" id="mic" checked> Audio</label>
+    <div id="micRow">
+      <label class="lbl" for="micSel">Audio from</label>
+      <select id="micSel"><option value="">Default microphone</option></select>
+    </div>
     <label class="check" id="soundRow" hidden><input type="checkbox" id="audio"> Phone sound (if iOS allows it)</label>
 
     <button id="go">Go live</button>
+  </div>
+
+  <div id="camRow">
+    <label class="lbl" for="camSel">Camera</label>
+    <select id="camSel">
+      <option value="user">Front camera (default)</option>
+      <option value="environment">Back camera</option>
+    </select>
+    <p class="hint">Using a camcorder? Plug it into a capture card on this computer and pick it here.</p>
   </div>
 
   <div id="live" hidden>
@@ -107,6 +124,40 @@
   let peer = null, call = null, stream = null, extra = [], audioCtx = null, wakeLock = null;
   let room = '', retryTimer = null, connected = false, startedAt = 0, callSeq = 0;
   let mode = 'camera', source = 'camera', facing = 'user', dataConn = null, swapping = false;
+  const camSel = $('camSel'), micSel = $('micSel'), camRow = $('camRow');
+  try { const fc = localStorage.getItem('ringocast-cam'); if (fc) facing = fc; } catch (e) {}
+
+  // List cameras and audio inputs (names only appear after the first permission prompt).
+  async function listDevices() {
+    if (!md.enumerateDevices) return;
+    let devs = [];
+    try { devs = await md.enumerateDevices(); } catch (e) { return; }
+    const cams = devs.filter(d => d.kind === 'videoinput' && d.deviceId);
+    const mics = devs.filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const keepCam = facing, keepMic = micSel.value || (localStorage.getItem('ringocast-mic') || '');
+    camSel.innerHTML = '<option value="user">Front camera (default)</option><option value="environment">Back camera</option>';
+    cams.forEach((d, i) => { const o = document.createElement('option'); o.value = 'dev:' + d.deviceId; o.textContent = d.label || ('Camera ' + (i + 1)); camSel.appendChild(o); });
+    micSel.innerHTML = '<option value="">Default microphone</option>';
+    mics.forEach((d, i) => { const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || ('Audio input ' + (i + 1)); micSel.appendChild(o); });
+    // device ids can change between visits, so fall back to matching the saved name
+    const byLabel = (sel, label) => label && [...sel.options].find(o => o.textContent === label);
+    let camLabel = '', micLabel = ''; try { camLabel = localStorage.getItem('ringocast-cam-label') || ''; micLabel = localStorage.getItem('ringocast-mic-label') || ''; } catch (e) {}
+    if ([...camSel.options].some(o => o.value === keepCam)) camSel.value = keepCam;
+    else if (keepCam.startsWith('dev:') && byLabel(camSel, camLabel)) camSel.value = byLabel(camSel, camLabel).value;
+    else camSel.value = 'user';
+    if (camSel.value !== keepCam && !stream) facing = camSel.value;
+    micSel.value = [...micSel.options].some(o => o.value === keepMic) ? keepMic : ((byLabel(micSel, micLabel) || {}).value || '');
+  }
+  function saveChoices() {
+    try {
+      localStorage.setItem('ringocast-cam', facing);
+      localStorage.setItem('ringocast-cam-label', camSel.selectedIndex >= 0 ? camSel.options[camSel.selectedIndex].textContent : '');
+      localStorage.setItem('ringocast-mic', micSel.value);
+      localStorage.setItem('ringocast-mic-label', micSel.value ? micSel.options[micSel.selectedIndex].textContent : '');
+    } catch (e) {}
+  }
+  if (md.addEventListener) md.addEventListener('devicechange', listDevices);
+  listDevices();
   const nameEl = $('name'), tallyEl = $('tally');
   let device = '';
   try { device = localStorage.getItem('ringocast-device') || ''; } catch (e) {}
@@ -132,12 +183,15 @@
     mode = m;
     modeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
     $('soundRow').hidden = m !== 'screen';
+    camRow.hidden = m !== 'camera';
     goBtn.disabled = m === 'camera' ? !canCamera : !canScreen;
     if (m === 'screen' && !canScreen) setStatus("This phone's browser can't share its screen (needs iOS 27+). Camera works.", 'err');
     else if (m === 'camera' && !canCamera) setStatus("This browser can't use the camera.", 'err');
     else setStatus('Not connected');
   }
   modeBtns.forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  micEl.addEventListener('change', () => { $('micRow').hidden = !micEl.checked; });
+  micEl.closest('label').before(camRow);
   if (params.get('mode') === 'screen') setMode('screen'); else setMode('camera');
   if (!canScreen) modeBtns.find(b => b.dataset.mode === 'screen').disabled = true;
 
@@ -153,10 +207,13 @@
 
   function showLiveUI(on) {
     $('setup').hidden = on; $('live').hidden = !on; $('tips').hidden = on;
+    if (on) $('live').appendChild(camRow); else micEl.closest('label').before(camRow);   // picker sits in the form, then under the live buttons
     updateControls();
   }
   function updateControls() {
-    flipBtn.hidden = source !== 'camera';
+    flipBtn.hidden = source !== 'camera' || facing.startsWith('dev:');
+    camRow.hidden = stream ? source !== 'camera' : mode !== 'camera';
+    if (camSel.value !== facing && [...camSel.options].some(o => o.value === facing)) camSel.value = facing;
     srcBtn.hidden = source === 'camera' ? !canScreen : !canCamera;
     srcBtn.textContent = source === 'camera' ? 'Share screen' : 'Back to camera';
     preview.classList.toggle('mirror', source === 'camera' && facing === 'user');
@@ -257,12 +314,21 @@
   }
 
   // ---- capture
-  const micConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-  const camConstraints = f => ({ facingMode: { ideal: f }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } });
+  // facing holds the camera choice: 'user', 'environment', or 'dev:<deviceId>' (capture card, USB camcorder…)
+  const camConstraints = f => {
+    const base = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } };
+    return f && f.startsWith('dev:') ? { ...base, deviceId: { exact: f.slice(4) } } : { ...base, facingMode: { ideal: f } };
+  };
+  // A chosen input (e.g. a capture card's audio) is line-level, so skip the voice processing.
+  function micConstraints() {
+    const id = micSel.value;
+    return id ? { deviceId: { exact: id }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+              : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  }
 
   async function captureCamera() {
     try {
-      return await md.getUserMedia({ video: camConstraints(facing), audio: micEl.checked ? micConstraints : false });
+      return await md.getUserMedia({ video: camConstraints(facing), audio: micEl.checked ? micConstraints() : false });
     } catch (e) {
       if (micEl.checked && e && e.name !== 'NotAllowedError') {
         log('camera+mic failed (' + e.name + '), trying camera only');
@@ -282,7 +348,7 @@
     }
     let mic = null;
     if (micEl.checked) {
-      try { mic = await md.getUserMedia({ audio: micConstraints }); log('mic: on'); }
+      try { mic = await md.getUserMedia({ audio: micConstraints() }); log('mic: on'); }
       catch (e) { log('mic: blocked (' + e.name + '). Allow the microphone for this site in Safari.'); }
     }
     const sa = screen.getAudioTracks(), ma = mic ? mic.getAudioTracks() : [];
@@ -342,6 +408,8 @@
     }
 
     source = mode;
+    saveChoices();
+    listDevices();
     describe(stream);
     watchTracks(stream);
     preview.srcObject = stream; preview.style.display = 'block';
@@ -387,7 +455,7 @@
   flipBtn.addEventListener('click', async () => {
     if (!stream || source !== 'camera') return;
     flipBtn.disabled = srcBtn.disabled = true;
-    try { await toCamera(facing === 'user' ? 'environment' : 'user'); log('camera flipped'); }
+    try { await toCamera(facing === 'user' ? 'environment' : 'user'); log('camera flipped'); saveChoices(); }
     catch (e) { log('flip failed: ' + (e && e.name) + ' ' + (e && e.message || '')); await rescueCamera(); }
     flipBtn.disabled = srcBtn.disabled = false;
   });
@@ -408,6 +476,15 @@
       await rescueCamera();
     }
     flipBtn.disabled = srcBtn.disabled = false;
+  });
+
+  camSel.addEventListener('change', async () => {
+    const want = camSel.value;
+    if (!stream || source !== 'camera') { facing = want; updateControls(); return; }
+    camSel.disabled = flipBtn.disabled = srcBtn.disabled = true;
+    try { await toCamera(want); log('camera: ' + camSel.options[camSel.selectedIndex].textContent); saveChoices(); }
+    catch (e) { log('camera switch failed: ' + (e && e.name) + ' ' + (e && e.message || '')); await rescueCamera(); camSel.value = facing; }
+    camSel.disabled = flipBtn.disabled = srcBtn.disabled = false;
   });
 
   muteBtn.addEventListener('click', () => {

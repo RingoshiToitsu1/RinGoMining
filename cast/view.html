@@ -237,7 +237,7 @@
     dbg.hidden = false;
     setInterval(() => {
       const f = cams.get(featured), s = f && f.stream, at = s ? s.getAudioTracks() : [];
-      dbg.textContent = 'v8 | phones: ' + liveCams().length + ' | on air: ' + (f ? f.name : 'none')
+      dbg.textContent = 'v9 | phones: ' + liveCams().length + ' | on air: ' + (f ? f.name : 'none')
         + ' | audio: ' + (s ? (at.length ? (at[0].muted ? 'silent from phone' : 'live') : 'NONE sent') : '-')
         + ' | ' + (audioBlocked ? 'MUTED (autoplay blocked)' : 'unmuted')
         + ' | ' + (window.obsstudio ? 'in OBS' : 'in browser');
