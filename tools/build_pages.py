@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from i18n import (APR, APR_DATE, B, HUB_SLUG, LANG_NAMES, LANG_ORDER, LOCALES, PREFIX,  # noqa: E402
-                  ROOT_PAGES, SRC_LINKS, UI, VIDEOS, fmt_date)
+                  MONTHS, ROOT_PAGES, SRC_LINKS, UI, VIDEOS, fmt_date)
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "tools" / "pages"
@@ -356,7 +356,8 @@ def build_hub(lang, pages, alts):
 def load(lang):
     pages = []
     for f in sorted((SRC / lang).glob("*.html")):
-        raw = f.read_text()
+        # {MONTH_YEAR} keeps dated titles (e.g. "Promo Code RINGO5 (November 2026)") current on every build
+        raw = f.read_text().replace("{MONTH_YEAR}", f"{MONTHS[lang][int(time.strftime('%m')) - 1]} {time.strftime('%Y')}")
         m = re.match(r"\s*<!--META\s*(\{.*?\})\s*-->\s*(.*)", raw, re.S)
         if not m:
             raise SystemExit(f"{lang}/{f.name}: missing META block")
