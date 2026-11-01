@@ -69,6 +69,12 @@ var CLAIM_MAIL = {
     subject: 'Got your GoMining ID',
     body: 'Hey,\n\nRingo here. Got your GoMining ID: {gmid}\n\n' +
       "I'll check it against my referral list to confirm you're under my code RINGO5.\n\n" +
+      'Here is my setup checklist:\n' +
+      '1. Do the GoMining Academy first. It grows your bonus miner.\n' +
+      '2. Know the fees before you buy (they take about half on my account): https://ringomining.com/gomining-fees/\n' +
+      '3. Run your numbers: https://ringomining.com/gomining-calculator/\n' +
+      '4. Know how to cash out: https://ringomining.com/gomining-withdrawal/\n' +
+      'Only invest what you can afford to lose.\n\n' +
       "If you haven't bought your terahash yet, go ahead whenever you're ready. GoMining adds 5% bonus terahash to your first miner.\n\n" +
       'Questions? Just reply to this email, or message me on Telegram: {tg}\n\nRingo\nringomining.com'
   },
@@ -76,6 +82,12 @@ var CLAIM_MAIL = {
     subject: 'ID GoMining bien reçu',
     body: 'Bonjour,\n\nIci Ringo. J\'ai bien reçu votre ID GoMining : {gmid}\n\n' +
       'Je le vérifie dans ma liste de filleuls pour confirmer que vous êtes inscrit avec mon code RINGO5.\n\n' +
+      'Voici ma checklist de démarrage :\n' +
+      '1. Faites d\'abord l\'Academy de GoMining. Elle fait grandir votre mineur bonus.\n' +
+      '2. Comprenez les frais avant d\'acheter (environ la moitié sur mon compte) : https://ringomining.com/fr/frais-gomining/\n' +
+      '3. Faites vos calculs : https://ringomining.com/fr/calculateur-gomining/\n' +
+      '4. Sachez comment retirer : https://ringomining.com/fr/retrait-gomining/\n' +
+      'N\'investissez que ce que vous pouvez vous permettre de perdre.\n\n' +
       'Si vous n\'avez pas encore acheté votre térahash, faites-le quand vous êtes prêt. GoMining ajoute 5 % de térahash bonus à votre premier mineur.\n\n' +
       'Des questions ? Répondez simplement à cet e-mail, ou écrivez-moi sur Telegram : {tg}\n\nRingo\nringomining.com'
   },
@@ -83,6 +95,12 @@ var CLAIM_MAIL = {
     subject: 'Recibí tu ID de GoMining',
     body: 'Hola,\n\nSoy Ringo. Recibí tu ID de GoMining: {gmid}\n\n' +
       'Lo reviso en mi lista de referidos para confirmar que estás con mi código RINGO5.\n\n' +
+      'Aquí va mi checklist de inicio:\n' +
+      '1. Haz primero la Academy de GoMining. Hace crecer tu minero de bono.\n' +
+      '2. Entiende las comisiones antes de comprar (en mi cuenta se llevan más o menos la mitad): https://ringomining.com/es/comisiones-gomining/\n' +
+      '3. Haz tus números: https://ringomining.com/es/calculadora-gomining/\n' +
+      '4. Aprende a retirar: https://ringomining.com/es/retiro-gomining/\n' +
+      'Invierte solo lo que puedas permitirte perder.\n\n' +
       'Si todavía no compraste tu terahash, hazlo cuando estés listo. GoMining añade un 5 % de terahash de bono a tu primer minero.\n\n' +
       '¿Preguntas? Responde a este correo o escríbeme por Telegram: {tg}\n\nRingo\nringomining.com'
   },
@@ -90,6 +108,12 @@ var CLAIM_MAIL = {
     subject: 'Deine GoMining-ID ist da',
     body: 'Hey,\n\nhier ist Ringo. Ich habe deine GoMining-ID bekommen: {gmid}\n\n' +
       'Ich prüfe sie in meiner Empfehlungsliste, um zu bestätigen, dass du über meinen Code RINGO5 dabei bist.\n\n' +
+      'Hier ist meine Start-Checkliste:\n' +
+      '1. Mach zuerst die GoMining Academy. Sie lässt deinen Bonus-Miner wachsen.\n' +
+      '2. Versteh die Gebühren vor dem Kauf (bei mir etwa die Hälfte): https://ringomining.com/de/gomining-gebuehren/\n' +
+      '3. Rechne deine Zahlen durch: https://ringomining.com/de/gomining-rechner/\n' +
+      '4. Wisse, wie du auszahlst: https://ringomining.com/de/gomining-auszahlung/\n' +
+      'Investiere nur Geld, dessen Verlust du verkraften kannst.\n\n' +
       'Falls du deinen Terahash noch nicht gekauft hast, mach das, wenn du bereit bist. GoMining legt 5 % Bonus-Terahash auf deinen ersten Miner drauf.\n\n' +
       'Fragen? Antworte einfach auf diese E-Mail oder schreib mir auf Telegram: {tg}\n\nRingo\nringomining.com'
   }
