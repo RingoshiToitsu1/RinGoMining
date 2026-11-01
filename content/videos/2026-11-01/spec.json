@@ -1,0 +1,54 @@
+{
+ "01-5-million-miners": [
+  {"photo": null, "text": "*5.6 million* people mine bitcoin on GoMining", "size": 100},
+  {"photo": null, "text": "No machines at home", "sub": "No power bill. No repairs."},
+  {"photo": "fire-racks-wide.jpg", "text": "I learned that the *hard way*"},
+  {"photo": "fire-whatsminers.jpg", "text": "My own miners *burned down*"},
+  {"photo": null, "text": "Now I'm one of the *5.6 million*", "sub": "Mining daily since May 2025"},
+  {"end": true}
+ ],
+ "02-gomining-has-a-feed-now": [
+  {"photo": null, "text": "GoMining just added a *social feed*", "size": 100},
+  {"photo": null, "text": "It's called *Community*", "sub": "Right inside the app"},
+  {"photo": null, "text": "Miners post updates *in the app*", "sub": "What they're mining, what's working"},
+  {"photo": null, "text": "Got questions while you're in there?", "sub": "Message me. I answer myself."},
+  {"end": true}
+ ],
+ "03-bitcoin-dips-keep-mining": [
+  {"photo": null, "text": "Bitcoin dips? *I keep mining.*", "size": 100},
+  {"photo": null, "text": "When bitcoin's low", "sub": "Every reward buys more bitcoin"},
+  {"photo": "review/earnings.png", "text": "Paid *every single day*", "text_y": 300},
+  {"photo": null, "text": "*Real talk*", "sub": "Fees take about half. Only invest what you can afford to lose."},
+  {"end": true}
+ ],
+ "04-how-much-to-start": [
+  {"photo": null, "text": "How much do you need to start *GoMining?*", "size": 96},
+  {"photo": null, "text": "*One terahash*", "sub": "That's it. Start small."},
+  {"photo": null, "text": "Do the *Academy* first", "sub": "It grows your bonus miner"},
+  {"photo": null, "text": "Code *RINGO5* before you buy", "sub": "GoMining adds 5% bonus terahash"},
+  {"end": true}
+ ],
+ "05-the-fee-nobody-talks-about": [
+  {"photo": null, "text": "The GoMining fee *nobody talks about*", "size": 100},
+  {"photo": null, "text": "Electricity + maintenance", "sub": "Taken out of your rewards daily"},
+  {"photo": null, "text": "On my account? *About half.*"},
+  {"photo": null, "text": "How I cut mine *28%*", "sub": "Lock tokens for the discount"},
+  {"photo": null, "text": "Full breakdown", "sub": "ringomining.com/gomining-fees"},
+  {"end": true}
+ ],
+ "06-33k-mined": [
+  {"photo": "review/earnings.png", "text": "Over *$33,000* in mining rewards", "text_y": 300},
+  {"photo": "fire-container.jpg", "text": "After my miners *burned down*"},
+  {"photo": null, "text": "I reinvested *everything*", "sub": "Since May 2025"},
+  {"photo": null, "text": "I never touch a machine", "sub": "GoMining runs them"},
+  {"end": true}
+ ],
+ "07-november-start": [
+  {"photo": null, "text": "New month. *Start mining.*", "size": 110},
+  {"photo": null, "text": "1. Sign up with *RINGO5*"},
+  {"photo": null, "text": "2. Do the *Academy*"},
+  {"photo": null, "text": "3. Buy your first *terahash*"},
+  {"photo": null, "text": "4. Send me your ID", "sub": "I'll email you my setup checklist"},
+  {"end": true}
+ ]
+}
