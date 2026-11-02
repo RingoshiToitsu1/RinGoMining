@@ -33,10 +33,25 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "tools" / "pages"
 DOMAIN = "https://ringomining.com"
 VER = time.strftime("%Y%m%d%H%M")
-# Ringo's own YouTube review, embedded on the review pages (with VideoObject markup)
-MY_VIDEO = {"id": "2gPaPPfowQo", "title": "GoMining Review 2026: My Real Results After 17 Months",
-            "uploaded": "2026-10-10",
-            "description": "My GoMining review after 17 months: my real dashboard, what it mines per day, the electricity fee, how I cut fees by locking tokens, and how I get money out."}
+# Ringo's own YouTube reviews, newest first (embedded with VideoObject markup)
+MY_VIDEOS = [
+    {"id": "xwOTD1QRvcI", "title": "GoMining Review 2026: My Real Results After 18 Months (Bitcoin Down)",
+     "uploaded": "2026-11-02",
+     "description": "What my 7,000 TH GoMining setup earns with bitcoin down: my real dashboard, the fee, why I take rewards in GoMining token, GoMining stopping 12-watt miner sales, and why I'm still buying.",
+     "cap": {"en": "Latest: 18 months on GoMining with bitcoin down. 7,000 TH, real numbers.",
+             "fr": "Dernière vidéo : 18 mois sur GoMining avec le bitcoin en baisse. 7 000 TH, vrais chiffres (en anglais).",
+             "es": "Lo más reciente: 18 meses en GoMining con el bitcoin a la baja. 7.000 TH, números reales (en inglés).",
+             "de": "Neu: 18 Monate GoMining bei fallendem Bitcoin. 7.000 TH, echte Zahlen (auf Englisch)."}},
+    {"id": "2gPaPPfowQo", "title": "GoMining Review 2026: My Real Results After 17 Months",
+     "uploaded": "2026-10-10",
+     "description": "My GoMining review after 17 months: my real dashboard, what it mines per day, the electricity fee, how I cut fees by locking tokens, and how I get money out.",
+     "cap": {"en": "Watch my review: 17 months on GoMining, my real dashboard, real numbers.",
+             "fr": "Ma revue en vidéo : 17 mois sur GoMining, mon vrai tableau de bord (en anglais).",
+             "es": "Mi reseña en video: 17 meses en GoMining, mi panel real (en inglés).",
+             "de": "Mein Review als Video: 17 Monate GoMining, mein echtes Dashboard (auf Englisch)."}},
+]
+
+
 FONTS = ("https://fonts.googleapis.com/css2?family=Anton&family=Outfit:wght@600;700"
          "&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap")
 
@@ -60,19 +75,19 @@ def blocks(lang):
       </button>
       <figcaption><b>{esc(place[lang])}</b> · VoskCoin: “{esc(title)}”</figcaption>
     </figure>""")
-    my_cap = {"en": "Watch my review: 17 months on GoMining, my real dashboard, real numbers.",
-              "fr": "Ma revue en vidéo : 17 mois sur GoMining, mon vrai tableau de bord (en anglais).",
-              "es": "Mi reseña en video: 17 meses en GoMining, mi panel real (en inglés).",
-              "de": "Mein Review als Video: 17 Monate GoMining, mein echtes Dashboard (auf Englisch)."}[lang]
-    return {
-        "MYVIDEO": f"""
+    def my_fig(v):
+        return f"""
 <figure class="yt">
-  <button class="yt-lite" type="button" data-yt="{MY_VIDEO['id']}" aria-label="{esc(t['vid_play'])}: {esc(MY_VIDEO['title'])}">
-    <img src="https://i.ytimg.com/vi/{MY_VIDEO['id']}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360">
+  <button class="yt-lite" type="button" data-yt="{v['id']}" aria-label="{esc(t['vid_play'])}: {esc(v['title'])}">
+    <img src="https://i.ytimg.com/vi/{v['id']}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360">
     <span class="yt-play" aria-hidden="true"></span>
   </button>
-  <figcaption><b>{esc(my_cap)}</b></figcaption>
-</figure>""",
+  <figcaption><b>{esc(v['cap'][lang])}</b></figcaption>
+</figure>"""
+
+    return {
+        "MYVIDEO": "".join(my_fig(v) for v in MY_VIDEOS),
+        "MYVIDEO_LATEST": my_fig(MY_VIDEOS[0]),
         "P": P,
         "APR": APR,
         "APR_DATE": apr_date,
@@ -313,12 +328,14 @@ def build_page(lang, meta, pages, alts):
             {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": re.sub(r"<[^>]+>", "", a)}}
             for q, a in meta["faq"]]})
 
-    if "{{MYVIDEO}}" in meta["_body"]:
-        extra_ld.append({"@context": "https://schema.org", "@type": "VideoObject", "name": MY_VIDEO["title"],
-                         "description": MY_VIDEO["description"], "uploadDate": MY_VIDEO["uploaded"],
-                         "thumbnailUrl": f"https://i.ytimg.com/vi/{MY_VIDEO['id']}/hqdefault.jpg",
-                         "contentUrl": f"https://www.youtube.com/watch?v={MY_VIDEO['id']}",
-                         "embedUrl": f"https://www.youtube.com/embed/{MY_VIDEO['id']}"})
+    body_src = meta["_body"]
+    shown = MY_VIDEOS if "{{MYVIDEO}}" in body_src else MY_VIDEOS[:1] if "{{MYVIDEO_LATEST}}" in body_src else []
+    for v in shown:
+        extra_ld.append({"@context": "https://schema.org", "@type": "VideoObject", "name": v["title"],
+                         "description": v["description"], "uploadDate": v["uploaded"],
+                         "thumbnailUrl": f"https://i.ytimg.com/vi/{v['id']}/hqdefault.jpg",
+                         "contentUrl": f"https://www.youtube.com/watch?v={v['id']}",
+                         "embedUrl": f"https://www.youtube.com/embed/{v['id']}"})
 
     related = [p for p in pages if p["slug"] != meta["slug"]]
     rel_html = "".join(f'<a class="rel" href="{page_path(lang, p["slug"])}"><b>{esc(p["short"])}</b><span>{esc(p["blurb"])}</span></a>' for p in related)
