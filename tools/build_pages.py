@@ -33,6 +33,10 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "tools" / "pages"
 DOMAIN = "https://ringomining.com"
 VER = time.strftime("%Y%m%d%H%M")
+# Ringo's own YouTube review, embedded on the review pages (with VideoObject markup)
+MY_VIDEO = {"id": "2gPaPPfowQo", "title": "GoMining Review 2026: My Real Results After 17 Months",
+            "uploaded": "2026-10-10",
+            "description": "My GoMining review after 17 months: my real dashboard, what it mines per day, the electricity fee, how I cut fees by locking tokens, and how I get money out."}
 FONTS = ("https://fonts.googleapis.com/css2?family=Anton&family=Outfit:wght@600;700"
          "&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap")
 
@@ -56,7 +60,19 @@ def blocks(lang):
       </button>
       <figcaption><b>{esc(place[lang])}</b> · VoskCoin: “{esc(title)}”</figcaption>
     </figure>""")
+    my_cap = {"en": "Watch my review: 17 months on GoMining, my real dashboard, real numbers.",
+              "fr": "Ma revue en vidéo : 17 mois sur GoMining, mon vrai tableau de bord (en anglais).",
+              "es": "Mi reseña en video: 17 meses en GoMining, mi panel real (en inglés).",
+              "de": "Mein Review als Video: 17 Monate GoMining, mein echtes Dashboard (auf Englisch)."}[lang]
     return {
+        "MYVIDEO": f"""
+<figure class="yt">
+  <button class="yt-lite" type="button" data-yt="{MY_VIDEO['id']}" aria-label="{esc(t['vid_play'])}: {esc(MY_VIDEO['title'])}">
+    <img src="https://i.ytimg.com/vi/{MY_VIDEO['id']}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360">
+    <span class="yt-play" aria-hidden="true"></span>
+  </button>
+  <figcaption><b>{esc(my_cap)}</b></figcaption>
+</figure>""",
         "P": P,
         "APR": APR,
         "APR_DATE": apr_date,
@@ -296,6 +312,13 @@ def build_page(lang, meta, pages, alts):
         extra_ld.append({"@context": "https://schema.org", "@type": "FAQPage", "inLanguage": lang, "mainEntity": [
             {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": re.sub(r"<[^>]+>", "", a)}}
             for q, a in meta["faq"]]})
+
+    if "{{MYVIDEO}}" in meta["_body"]:
+        extra_ld.append({"@context": "https://schema.org", "@type": "VideoObject", "name": MY_VIDEO["title"],
+                         "description": MY_VIDEO["description"], "uploadDate": MY_VIDEO["uploaded"],
+                         "thumbnailUrl": f"https://i.ytimg.com/vi/{MY_VIDEO['id']}/hqdefault.jpg",
+                         "contentUrl": f"https://www.youtube.com/watch?v={MY_VIDEO['id']}",
+                         "embedUrl": f"https://www.youtube.com/embed/{MY_VIDEO['id']}"})
 
     related = [p for p in pages if p["slug"] != meta["slug"]]
     rel_html = "".join(f'<a class="rel" href="{page_path(lang, p["slug"])}"><b>{esc(p["short"])}</b><span>{esc(p["blurb"])}</span></a>' for p in related)
