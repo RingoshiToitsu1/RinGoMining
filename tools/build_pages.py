@@ -35,7 +35,7 @@ DOMAIN = "https://ringomining.com"
 VER = time.strftime("%Y%m%d%H%M")
 # Ringo's own YouTube reviews, newest first (embedded with VideoObject markup)
 MY_VIDEOS = [
-    {"id": "xwOTD1QRvcI", "title": "GoMining Review 2026: My Real Results After 18 Months (Bitcoin Down)",
+    {"id": "xwOTD1QRvcI", "title": "GoMining Review 2026: My Real Results After 18 Months",
      "uploaded": "2026-11-02",
      "description": "What my 7,000 TH GoMining setup earns with bitcoin down: my real dashboard, the fee, why I take rewards in GoMining token, GoMining stopping 12-watt miner sales, and why I'm still buying.",
      "cap": {"en": "Latest: 18 months on GoMining with bitcoin down. 7,000 TH, real numbers.",
