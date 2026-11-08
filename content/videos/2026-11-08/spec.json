@@ -1,0 +1,52 @@
+{
+ "01-worst-october-since-2016": [
+  {"photo": null, "text": "Bitcoin's *worst October* since 2016", "size": 100},
+  {"photo": null, "text": "Now it's under *$76K*"},
+  {"photo": null, "text": "Did I sell?", "sub": "No. I kept mining."},
+  {"photo": "../../content/videos/2026-11-08/src/dashboard-nov.png", "text": "Still paid *every day*", "text_y": 300},
+  {"photo": null, "text": "I'm stacking more bitcoin *while it's cheap*"},
+  {"end": true}
+ ],
+ "02-gift-a-bitcoin-miner": [
+  {"photo": null, "text": "Christmas gift idea: a *bitcoin miner*", "size": 100},
+  {"photo": null, "text": "GoMining Gifts", "sub": "Send a digital miner with one link"},
+  {"photo": null, "text": "No box. No noise. *No power bill.*"},
+  {"photo": null, "text": "It mines bitcoin *every day*", "sub": "For whoever you send it to"},
+  {"end": true}
+ ],
+ "03-my-233-day-broken-down": [
+  {"photo": null, "text": "My *$233* mining day, broken down", "size": 100},
+  {"photo": "../../content/videos/2026-11-08/src/reward-breakdown.png", "text": "Electricity: *$93*", "text_y": 220},
+  {"photo": "../../content/videos/2026-11-08/src/reward-breakdown.png", "text": "Service: *$45*", "text_y": 220},
+  {"photo": null, "text": "I kept about *$93*", "sub": "Fees take about 60% right now"},
+  {"photo": null, "text": "That's mining. *Same as real machines.*", "sub": "Except nothing in my house can burn down"},
+  {"end": true}
+ ],
+ "04-19-miners-none-at-home": [
+  {"photo": null, "text": "I own *19* bitcoin miners", "size": 110},
+  {"photo": "../../content/videos/2026-11-08/src/miners-list.png", "text": "None of them are *in my house*", "text_y": 260},
+  {"photo": "fire-whatsminers.jpg", "text": "The last ones that were? *They burned.*"},
+  {"photo": null, "text": "Now GoMining runs them", "sub": "Power, repairs, hosting. All of it."},
+  {"end": true}
+ ],
+ "05-new-users-15w": [
+  {"photo": null, "text": "New to GoMining? You get *15W miners*", "size": 96},
+  {"photo": null, "text": "12W is gone for new buys", "sub": "And honestly? That's fine."},
+  {"photo": null, "text": "15W is *much cheaper*"},
+  {"photo": null, "text": "Upgrading to 12W?", "sub": "Costs way more, earns about the same"},
+  {"end": true}
+ ],
+ "06-under-76k-buy-zone": [
+  {"photo": null, "text": "Bitcoin under *$76K?*", "size": 110},
+  {"photo": null, "text": "People are *panic selling*"},
+  {"photo": null, "text": "I'm *buying terahash*", "sub": "Every reward stacks more bitcoin"},
+  {"photo": null, "text": "*Real talk*", "sub": "It can go lower first. Only invest what you can afford to lose."},
+  {"end": true}
+ ],
+ "07-watch-my-18-month-review": [
+  {"photo": "../../content/videos/2026-11-08/src/dashboard-nov.png", "text": "*18 months* on GoMining", "text_y": 280},
+  {"photo": null, "text": "Almost *$40,000* mined", "sub": "Real dashboard. Real fees."},
+  {"photo": null, "text": "Full breakdown *on my channel*", "sub": "GoMining Review 2026: 18 Months"},
+  {"end": true}
+ ]
+}

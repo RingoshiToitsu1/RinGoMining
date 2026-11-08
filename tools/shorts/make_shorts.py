@@ -28,7 +28,11 @@ def cover(im, w, h):
 def draw_rich(d, text, y, size, color=TEXT, maxw=960):
     """Centered, word-wrapped text; *word* renders in ember. Returns bottom y."""
     f = font(BLACK, size)
-    words = [(w.strip("*"), w.startswith("*")) for w in text.split()]
+    words, hi = [], False
+    for w in text.split():
+        starts, ends = w.startswith("*"), w.endswith("*")
+        words.append((w.strip("*"), hi or starts))
+        hi = (hi or starts) and not ends
     lines, cur = [], []
     for w in words:
         trial = " ".join(x for x, _ in cur + [w])
@@ -142,7 +146,7 @@ VIDEOS = {
 
 def from_spec(path):
     """JSON spec: {"video-name": [{"photo": "fire-cables.jpg" or null, "text": "...", "sub": "...", "secs": 2.8}, ..., {"end": true}]}.
-    Photos are relative to assets/img. Wrap a word in *asterisks* to color it orange."""
+    Photos are relative to assets/img. Wrap a word or phrase in *asterisks* to color it orange."""
     import json
     spec = json.load(open(path))
     return {name: [(end_card(), 3.4) if s.get("end") else
