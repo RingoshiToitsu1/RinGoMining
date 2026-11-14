@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from ...config.settings import Settings
+from ...infra.ratelimit import RateLimiter
 from ...core.types import (CENT, ONE, ZERO, Balance, D, EligibilityReport, Exchange, FeeSpec, Level, Market,
                            OrderBook, OrderRequest, OrderResult, OrderStatus, Outcome, Resolution, Side, TIF)
 from ..base import ExchangeAdapter, ExchangeError, ExchangeUnavailable, TradingDisabled
@@ -55,6 +56,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
                 timeout=10.0)
         self.c = client
         self.trading_enabled = False
+        self._read_limiter = RateLimiter(settings.polymarket_reads_per_second, burst=8)
         self.fee_rate = Decimal(str(settings.polymarket_us_taker_fee_rate))
         self.short_price_is_long = settings.polymarket_us_short_price_convention == "long"
 
@@ -63,9 +65,14 @@ class PolymarketUSAdapter(ExchangeAdapter):
 
     async def _call(self, coro: Any, *, write: bool = False) -> Any:
         from polymarket_us import errors as E
+        if not write:
+            await self._read_limiter.acquire()
         try:
             return await coro
-        except (E.APIConnectionError, E.InternalServerError, E.RateLimitError) as e:
+        except E.RateLimitError as e:
+            self._read_limiter.penalize(5.0)
+            raise ExchangeUnavailable(f"polymarket-us: {e}") from e
+        except (E.APIConnectionError, E.InternalServerError) as e:
             raise ExchangeUnavailable(f"polymarket-us: {e}") from e
         except E.APIStatusError as e:
             raise ExchangeError(f"polymarket-us: {e}") from e

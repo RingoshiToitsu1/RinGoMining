@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from ...config.settings import Settings
+from ...infra.ratelimit import RateLimiter
 from ...core.types import (CENT, ONE, ZERO, Balance, D, EligibilityReport, Exchange, FeeSpec, Level, Market,
                            OrderBook, OrderRequest, OrderResult, OrderStatus, Outcome, Resolution, Side, TIF)
 from ..base import BookCallback, ExchangeAdapter, ExchangeError, ExchangeUnavailable, TradingDisabled
@@ -76,6 +77,8 @@ class KalshiAdapter(ExchangeAdapter):
         if pem:
             self._key = serialization.load_pem_private_key(pem.encode(), password=None)
         self.trading_enabled = False
+        # Kalshi's basic tier allows 20 reads/s; stay well under it by default
+        self._read_limiter = RateLimiter(settings.kalshi_reads_per_second, burst=5)
         self._series_fees: dict[str, tuple[str, Decimal]] = {}
 
     async def close(self) -> None:
@@ -96,12 +99,15 @@ class KalshiAdapter(ExchangeAdapter):
                 "KALSHI-ACCESS-SIGNATURE": base64.b64encode(sig).decode()}
 
     async def _request(self, method: str, path: str, *, params: Any = None, body: dict | None = None,
-                       auth: bool = False, retries: int = 2) -> dict:
-        """GETs are retried on transport errors and 429/5xx. Writes are never retried:
-        an unconfirmed write is reported as ExchangeUnavailable for the caller to resolve."""
+                       auth: bool = False, retries: int = 5) -> dict:
+        """GETs are retried on transport errors and 429/5xx with backoff. Writes are never
+        retried: an unconfirmed write is reported as ExchangeUnavailable for the caller to resolve.
+        Writes skip the read pacer so an order is never queued behind a discovery crawl."""
         headers = self._auth_headers(method, self._path_prefix + path) if auth else {}
         attempt = 0
         while True:
+            if method == "GET":
+                await self._read_limiter.acquire()
             try:
                 r = await self._http.request(method, path, params=params, json=body, headers=headers)
             except httpx.HTTPError as e:
@@ -113,7 +119,10 @@ class KalshiAdapter(ExchangeAdapter):
             if r.status_code == 429 or r.status_code >= 500:
                 if method == "GET" and attempt < retries:
                     attempt += 1
-                    await asyncio.sleep(float(r.headers.get("retry-after", 0.5 * attempt)))
+                    wait = float(r.headers.get("retry-after") or min(2 ** attempt * 0.5, 20.0))
+                    if r.status_code == 429:
+                        self._read_limiter.penalize(wait)
+                    await asyncio.sleep(wait)
                     if auth:
                         headers = self._auth_headers(method, self._path_prefix + path)
                     continue

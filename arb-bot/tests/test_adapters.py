@@ -270,3 +270,29 @@ async def test_polymarket_intl_geoblock_disables_trading_and_market_data_still_w
         await ad.place_order(OrderRequest(Exchange.POLYMARKET, m, Outcome.YES, Side.BUY, D("0.49"), D(10),
                                           TIF.IOC, "x"))
     await ad.close()
+
+
+async def test_kalshi_backs_off_on_429_and_paces_reads():
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        if len(calls) <= 2:
+            return httpx.Response(429, headers={"retry-after": "0.05"}, json={"error": "too_many_requests"})
+        return httpx.Response(200, json={"exchange_active": True})
+
+    k = kalshi(handler, kalshi_reads_per_second=50)
+    calls.clear()
+    st = await k._request("GET", "/exchange/status")
+    assert st["exchange_active"] and len(calls) == 3
+    await k.close()
+
+
+async def test_rate_limiter_paces():
+    import time
+    from arbbot.infra.ratelimit import RateLimiter
+    rl = RateLimiter(20, burst=1)
+    t = time.monotonic()
+    for _ in range(6):
+        await rl.acquire()
+    assert time.monotonic() - t >= 0.2

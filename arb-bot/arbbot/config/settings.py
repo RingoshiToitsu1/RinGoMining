@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     kalshi_api_key_id: str = ""
     kalshi_private_key_path: str = ""
     kalshi_private_key_pem: str = ""
+    kalshi_reads_per_second: float = 8.0
     # You attest that your account, jurisdiction and API agreement permit automated trading.
     kalshi_eligibility_confirmed: bool = False
 
@@ -46,6 +47,7 @@ class Settings(BaseSettings):
     polymarket_eligibility_confirmed: bool = False
     polymarket_us_key_id: str = ""
     polymarket_us_secret_key: str = ""
+    polymarket_reads_per_second: float = 10.0
     polymarket_us_api_url: str = "https://api.polymarket.us"
     polymarket_us_gateway_url: str = "https://gateway.polymarket.us"
     # Fallback taker fee (fraction of notional) used until the venue reports the real rate.
