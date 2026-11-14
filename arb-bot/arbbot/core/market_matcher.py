@@ -370,7 +370,9 @@ class MarketMatcher:
         if m is None:
             return False, "mapping not found"
         res = self.assess(m.kalshi, m.polymarket)
-        hard = [f for f in res.failures if "close times" in f or "years differ" in f]
+        # The operator has read both rule sets and may accept differences in wording or trading
+        # hours. Contracts about different years are never the same contract.
+        hard = [f for f in res.failures if "years differ" in f]
         if hard:
             return False, "deterministic validation failed and cannot be overridden: " + "; ".join(hard)
         checks = dict(m.checks or {})
@@ -398,7 +400,9 @@ class MarketMatcher:
                 continue  # market left discovery (closed/settled); positions are tracked separately
             if rules_hash(k) != row.kalshi_rules_hash or rules_hash(p) != row.polymarket_rules_hash:
                 reason = "market terms changed since verification"
-            else:
+            elif row.method != "manual":
+                # operator approvals already accepted any deterministic differences; for those,
+                # only a change in the contracts themselves (above) reopens the question
                 res = self.assess(k, p)
                 hard = [f for f in res.failures if "close times" in f or "years differ" in f]
                 if hard:

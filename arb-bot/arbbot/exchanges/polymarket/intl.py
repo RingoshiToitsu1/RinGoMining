@@ -313,7 +313,7 @@ class PolymarketIntlAdapter(ExchangeAdapter):
         if not page:
             return None
         m = page[0]
-        if not m.get("closed") or str(m.get("umaResolutionStatus", "resolved")).lower() not in ("resolved", ""):
+        if not m.get("closed") or str(m.get("umaResolutionStatus", "resolved")).lower() not in ("resolved", "", "none"):
             return None
         prices = [D(x) for x in _jlist(m.get("outcomePrices"))]
         if len(prices) != 2:

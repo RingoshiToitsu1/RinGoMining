@@ -150,9 +150,15 @@ class FakeUS:
 
         class Markets:
             async def list(self, params=None):
-                return {"markets": [{"id": 1, "slug": "btc-100k", "title": "Bitcoin above $100,000?", "outcome": "Yes",
-                                     "description": "Resolves per CF Benchmarks", "active": True, "closed": False,
-                                     "volume": 100.0, "liquidity": 50.0, "eventSlug": "btc-dec"}]}
+                # shape captured from the live gateway
+                return {"markets": [{
+                    "id": "7974", "slug": "btc-100k", "question": "Bitcoin above $100,000 on Dec 31, 2026?",
+                    "title": "Bitcoin above $100,000 on Dec 31, 2026?", "subtitle": "", "outcomes": "[\"No\",\"Yes\"]",
+                    "description": "Resolves per CF Benchmarks", "active": True, "closed": False, "archived": False,
+                    "status": "MARKET_STATUS_OPEN", "endDate": "2026-12-31T22:00:00Z", "category": "crypto",
+                    "feeCoefficient": 0.095, "minimumTradeQty": 1, "orderPriceMinTickSize": 0.001,
+                    "marketType": "futures", "marketSides": [{"description": "Yes", "long": True},
+                                                             {"description": "No", "long": False}]}]}
 
             async def book(self, slug):
                 return {"marketData": {"marketSlug": slug, "state": "MARKET_STATE_OPEN",
@@ -161,10 +167,6 @@ class FakeUS:
 
             async def settlement(self, slug):
                 return {"slug": slug, "settlement": 0.0}
-
-        class Events:
-            async def list(self, params=None):
-                return {"events": [{"slug": "btc-dec", "title": "BTC Dec 31", "endTime": "2026-12-31T22:00:00Z"}]}
 
         class Orders:
             async def create(self, params):
@@ -188,7 +190,7 @@ class FakeUS:
             async def positions(self, params=None):
                 return {"positions": {"btc-100k": {"netPosition": "-20"}}, "eof": True}
 
-        self.markets, self.events, self.orders = Markets(), Events(), Orders()
+        self.markets, self.orders = Markets(), Orders()
         self.account, self.portfolio = Account(), Portfolio()
 
     async def close(self):
@@ -202,6 +204,13 @@ async def test_polymarket_us_adapter():
     us = PolymarketUSAdapter(s, client=fake)
     m = (await us.list_markets())[0]
     assert m.market_id == "btc-100k" and m.close_time.year == 2026 and m.exchange is Exchange.POLYMARKET
+    assert m.fee.kind == "poly_exponent" and m.fee.rate == D("0.095") and m.tick_size == D("0.001")
+    assert m.yes_label == "Yes" and m.status == "open"
+    team = us._market({"slug": "mls-vwh", "question": "Major League Soccer Champion", "title": "Vancouver Whitecaps FC",
+                       "endDate": "2027-01-01T21:20:09Z", "status": "MARKET_STATUS_OPEN",
+                       "marketSides": [{"description": "Yes", "long": True}, {"description": "No", "long": False}]})
+    assert team.title == "Major League Soccer Champion: Vancouver Whitecaps FC"
+    assert team.yes_label == "Vancouver Whitecaps FC"
     book = await us.get_orderbook(m)
     assert book.best_ask(Outcome.YES) == D("0.51") and book.best_ask(Outcome.NO) == D("0.52")   # 1 - YES bid
     assert (await us.check_eligibility()).ok

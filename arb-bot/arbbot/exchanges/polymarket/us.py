@@ -96,45 +96,56 @@ class PolymarketUSAdapter(ExchangeAdapter):
             return False
 
     # -- discovery -------------------------------------------------------------------
-    def _fee(self) -> FeeSpec:
+    def _fee(self, m: dict | None = None) -> FeeSpec:
+        """Markets publish a `feeCoefficient`; it is modelled as coefficient * contracts * p * (1-p),
+        the standard quadratic exchange fee. Until a market reports one, the configured
+        notional rate applies. Real commissions are read back from every order."""
+        coef = (m or {}).get("feeCoefficient")
+        if coef not in (None, "", 0):
+            return FeeSpec("poly_exponent", D(coef), ONE)
         return FeeSpec("notional_bps", self.fee_rate)
 
-    def _market(self, m: dict, event: dict | None) -> Market | None:
+    def _market(self, m: dict, event: dict | None = None) -> Market | None:
+        """Live shape (gateway /v1/markets): `question` is the event question, `title` the
+        subject of this contract (e.g. a team), `marketSides` the long (YES) and short (NO) sides."""
         slug = m.get("slug")
         if not slug:
             return None
         event = event or {}
-        end = parse_ts(event.get("endTime"))
-        outcome = (m.get("outcome") or "").strip()
-        title = m.get("title") or event.get("title") or slug
-        if event.get("title") and event["title"] not in title:
-            title = f"{event['title']}: {title}"
-        desc = m.get("description") or event.get("description") or ""
+        question = (m.get("question") or event.get("title") or "").strip()
+        subject = (m.get("title") or "").strip()
+        sides = m.get("marketSides") or []
+        long_label = next((str(x.get("description") or "") for x in sides if x.get("long")), "")
+        short_label = next((str(x.get("description") or "") for x in sides if x.get("long") is False), "")
+        if long_label.lower() in ("", "yes"):
+            yes_label = subject if subject and subject != question else "Yes"
+            no_label = "No" if yes_label == "Yes" else f"Not {yes_label}"
+        else:
+            yes_label, no_label = long_label, short_label or f"Not {long_label}"
+        title = f"{question}: {subject}" if subject and subject not in question else (question or subject or slug)
+        end = parse_ts(m.get("endDate") or event.get("endDate") or event.get("endTime"))
+        is_open = (bool(m.get("active", True)) and not m.get("closed") and not m.get("archived")
+                   and m.get("status", "MARKET_STATUS_OPEN") == "MARKET_STATUS_OPEN")
         return Market(
-            Exchange.POLYMARKET, slug, title, yes_label=outcome or "Yes",
-            no_label="No" if not outcome or outcome.lower() == "yes" else f"Not {outcome}",
-            rules=desc, resolution_source="", category=",".join(t.get("slug", "") for t in event.get("tags") or []),
-            event_id=m.get("eventSlug") or event.get("slug", ""), close_time=end, expiration_time=end,
-            status="open" if m.get("active", True) and not m.get("closed") else "closed",
-            tick_size=CENT, fee=self._fee(), volume=D(m.get("volume")), liquidity=D(m.get("liquidity")),
-            url=f"https://polymarket.us/market/{slug}", extra={"venue": "us", "id": m.get("id")})
+            Exchange.POLYMARKET, slug, title, yes_label=yes_label, no_label=no_label,
+            subtitle=str(m.get("subtitle") or ""), rules=m.get("description") or event.get("description") or "",
+            resolution_source="", category=str(m.get("category") or ""),
+            event_id=str(m.get("eventSlug") or event.get("slug") or ""), close_time=end, expiration_time=end,
+            status="open" if is_open else "closed", tick_size=D(m.get("orderPriceMinTickSize") or CENT),
+            min_order_size=D(m.get("minimumTradeQty") or 1), fee=self._fee(m),
+            volume=D(m.get("volume")), liquidity=D(m.get("liquidity")),
+            url=f"https://polymarket.us/market/{slug}",
+            extra={"venue": "us", "id": m.get("id"), "market_type": m.get("marketType"),
+                   "subcategory": m.get("eventSubcategory")})
 
     async def list_markets(self) -> list[Market]:
         horizon = datetime.now(timezone.utc) + timedelta(days=self.s.discovery_max_days_to_close)
-        events: dict[str, dict] = {}
-        for offset in range(0, 20000, 100):
-            page = (await self._call(self.c.events.list(
-                {"active": True, "closed": False, "limit": 100, "offset": offset}))).get("events") or []
-            for ev in page:
-                events[ev.get("slug", "")] = ev
-            if len(page) < 100:
-                break
         out: list[Market] = []
-        for offset in range(0, 50000, 100):
+        for offset in range(0, 100000, 100):
             page = (await self._call(self.c.markets.list(
                 {"active": True, "closed": False, "limit": 100, "offset": offset}))).get("markets") or []
             for m in page:
-                mk = self._market(m, events.get(m.get("eventSlug", "")))
+                mk = self._market(m)
                 if mk and mk.status == "open" and mk.close_time and mk.close_time <= horizon \
                         and float(mk.volume) >= self.s.discovery_min_volume:
                     out.append(mk)
@@ -145,16 +156,11 @@ class PolymarketUSAdapter(ExchangeAdapter):
     async def get_market(self, market_id: str) -> Market | None:
         try:
             m = (await self._call(self.c.markets.retrieve_by_slug(market_id))).get("market")
-            if not m:
-                return None
-            ev = None
-            if m.get("eventSlug"):
-                ev = (await self._call(self.c.events.retrieve_by_slug(m["eventSlug"]))).get("event")
-            return self._market(m, ev)
         except ExchangeUnavailable:
             raise
         except ExchangeError:
             return None
+        return self._market(m) if m else None
 
     # -- order books -----------------------------------------------------------------
     async def get_orderbook(self, market: Market) -> OrderBook:
