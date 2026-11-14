@@ -67,6 +67,7 @@ class RuntimeConfig(BaseModel):
     operational_risk_bps: float = Field(10.0, ge=0, le=2000)
 
     # --- matching -------------------------------------------------------------
+    auto_verify_structural: bool = Field(False, description="treat contracts whose rules match field by field (crypto price contracts) as verified without manual approval")
     min_match_confidence: float = Field(98.0, ge=98, le=100, description="confidence required for automated execution")
     close_time_tolerance_hours: float = Field(36.0, ge=0, le=720)
     revalidate_hours: float = Field(6.0, gt=0, le=168)
@@ -77,6 +78,8 @@ class RuntimeConfig(BaseModel):
     discovery_interval_s: float = Field(900.0, ge=30, le=86400)
     settlement_check_interval_s: float = Field(300.0, ge=10, le=86400)
     max_watched_candidates: int = Field(10, ge=0, le=500, description="unverified pairs whose books are polled for review")
+    screen_interval_s: float = Field(4.0, ge=0.5, le=300, description="seconds between bulk quote screens")
+    screen_max_deep: int = Field(6, ge=1, le=100, description="max pairs per screen that get full order books")
     notify_opportunities: bool = True
     daily_summary_hour_utc: int = Field(0, ge=0, le=23)
 

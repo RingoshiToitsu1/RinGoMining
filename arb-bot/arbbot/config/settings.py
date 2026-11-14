@@ -68,13 +68,23 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     matcher_llm_model: str = "claude-opus-5-5"
 
-    # --- discovery filters -----------------------------------------------
+    # --- discovery -------------------------------------------------------
+    # crypto: only BTC/ETH/SOL/XRP daily price contracts (fast, few requests); all: every open market
+    discovery_scope: str = "crypto"
+    crypto_assets: str = "BTC,ETH,SOL,XRP"
+    # screen: cheap bulk top-of-book quotes, full books only where a gap shows (rate-limit friendly)
+    # books:  poll full order books for every watched pair
+    scan_mode: str = "screen"
     discovery_max_days_to_close: int = Field(default=120, ge=1)
     discovery_min_volume: float = 0.0
 
     @property
     def admin_ids(self) -> set[int]:
         return {int(x) for x in self.telegram_admin_ids.replace(" ", "").split(",") if x}
+
+    @property
+    def crypto_asset_set(self) -> set[str]:
+        return {x.strip().upper() for x in self.crypto_assets.split(",") if x.strip()}
 
     @property
     def is_sqlite(self) -> bool:

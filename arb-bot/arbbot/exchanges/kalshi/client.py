@@ -213,25 +213,55 @@ class KalshiAdapter(ExchangeAdapter):
                    "early_close_condition": m.get("early_close_condition")})
 
     async def list_markets(self) -> list[Market]:
-        if not self._series_fees:
-            await self._load_series_fees()
         horizon = datetime.now(timezone.utc) + timedelta(days=self.s.discovery_max_days_to_close)
+        series: list[str | None] = [None]
+        if self.s.discovery_scope == "crypto":
+            from ...core.crypto_matcher import ASSETS
+            series = [ASSETS[a]["kalshi_series"] for a in sorted(self.s.crypto_asset_set) if a in ASSETS]
+            for s_ in series:
+                await self._load_series_fee(s_)
+        elif not self._series_fees:
+            await self._load_series_fees()
         out: list[Market] = []
-        cursor = ""
-        for _ in range(500):
-            params: dict[str, Any] = {"status": "open", "with_nested_markets": "true", "limit": 200}
-            if cursor:
-                params["cursor"] = cursor
-            data = await self._request("GET", "/events", params=params)
-            for ev in data.get("events") or []:
-                for m in ev.get("markets") or []:
-                    mk = self._market(m, ev)
-                    if mk and mk.status == "open" and mk.close_time and mk.close_time <= horizon \
-                            and float(mk.volume) >= self.s.discovery_min_volume:
-                        out.append(mk)
-            cursor = data.get("cursor") or ""
-            if not cursor:
-                break
+        for ser in series:
+            cursor = ""
+            for _ in range(500):
+                params: dict[str, Any] = {"status": "open", "with_nested_markets": "true", "limit": 200}
+                if ser:
+                    params["series_ticker"] = ser
+                if cursor:
+                    params["cursor"] = cursor
+                data = await self._request("GET", "/events", params=params)
+                for ev in data.get("events") or []:
+                    for m in ev.get("markets") or []:
+                        mk = self._market(m, ev)
+                        if mk and mk.status == "open" and mk.close_time and mk.close_time <= horizon \
+                                and float(mk.volume) >= self.s.discovery_min_volume:
+                            out.append(mk)
+                cursor = data.get("cursor") or ""
+                if not cursor:
+                    break
+        return out
+
+    async def _load_series_fee(self, ticker: str) -> None:
+        if ticker in self._series_fees:
+            return
+        try:
+            s = (await self._request("GET", f"/series/{ticker}")).get("series") or {}
+            self._series_fees[ticker] = (s.get("fee_type") or "quadratic", D(s.get("fee_multiplier") or 1))
+        except ExchangeError as e:
+            log.warning("could not load fee for series %s, using the general schedule: %s", ticker, e)
+
+    async def get_quotes(self, markets: list[Market]) -> dict[str, tuple[Decimal | None, Decimal | None]]:
+        """One request per event returns top of book for every strike in it."""
+        wanted = {m.market_id for m in markets}
+        out: dict[str, tuple[Decimal | None, Decimal | None]] = {}
+        for ev in sorted({m.event_id for m in markets if m.event_id}):
+            data = await self._request("GET", f"/events/{ev}", params={"with_nested_markets": "true"})
+            for m in (data.get("event") or {}).get("markets") or data.get("markets") or []:
+                if m.get("ticker") in wanted:
+                    bid, ask = D(m.get("yes_bid_dollars")), D(m.get("yes_ask_dollars"))
+                    out[m["ticker"]] = (bid if bid > 0 else None, ask if 0 < ask < ONE else None)
         return out
 
     async def get_market(self, market_id: str) -> Market | None:

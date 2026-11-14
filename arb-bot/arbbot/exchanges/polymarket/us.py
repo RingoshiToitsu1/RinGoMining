@@ -183,10 +183,17 @@ class PolymarketUSAdapter(ExchangeAdapter):
     async def list_markets(self) -> list[Market]:
         horizon = datetime.now(timezone.utc) + timedelta(days=self.s.discovery_max_days_to_close)
         out: list[Market] = []
+        base: dict[str, Any] = {"active": True, "closed": False, "limit": 100}
+        crypto = self.s.discovery_scope == "crypto"
+        if crypto:
+            base["categories"] = ["crypto"]
+        assets = {a.lower() for a in self.s.crypto_asset_set}
         for offset in range(0, 100000, 100):
-            page = (await self._call(lambda o=offset: self.c.markets.list(
-                {"active": True, "closed": False, "limit": 100, "offset": o}))).get("markets") or []
+            page = (await self._call(lambda o=offset: self.c.markets.list({**base, "offset": o}))).get("markets") or []
             for m in page:
+                if crypto and not any(m.get("slug", "").startswith(f"cpc{'' if a == 'btc' else a}-{a}-")
+                                      for a in assets):
+                    continue
                 mk = self._market(m)
                 if mk and mk.status == "open" and mk.close_time and mk.close_time <= horizon \
                         and float(mk.volume) >= self.s.discovery_min_volume:
@@ -232,6 +239,22 @@ class PolymarketUSAdapter(ExchangeAdapter):
         errors = [r for r in results if isinstance(r, BaseException)]
         if markets and not out and errors:
             raise errors[0] if isinstance(errors[0], ExchangeError) else ExchangeUnavailable(str(errors[0])[:200])
+        return out
+
+    async def get_quotes(self, markets: list[Market]) -> dict[str, tuple[Decimal | None, Decimal | None]]:
+        """Market listings carry best bid/ask: 100 markets per request instead of 100 book calls."""
+        out: dict[str, tuple[Decimal | None, Decimal | None]] = {}
+        slugs = sorted({m.market_id for m in markets})
+        for i in range(0, len(slugs), 100):
+            chunk = slugs[i:i + 100]
+            page = (await self._call(lambda c=chunk: self.c.markets.list(
+                {"slug": c, "limit": 100}))).get("markets") or []
+            for m in page:
+                if m.get("closed") or not m.get("active", True):
+                    continue
+                bid = _amount(m["bestBidQuote"]) if m.get("bestBidQuote") else None
+                ask = _amount(m["bestAskQuote"]) if m.get("bestAskQuote") else None
+                out[m["slug"]] = (bid if bid and bid > 0 else None, ask if ask and 0 < ask < ONE else None)
         return out
 
     @property

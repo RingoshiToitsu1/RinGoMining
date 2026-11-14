@@ -188,6 +188,7 @@ class MarketMatcher:
     def __init__(self, cfg: RuntimeConfig, repo: Repository, bus: EventBus, verifier: RuleVerifier | None = None,
                  *, top_k: int = 2, min_similarity: float = 0.45, verify_above: float = 70.0,
                  max_postings: int = 400):
+        self._structural_ids: set[str] = set()
         self.cfg, self.repo, self.bus, self.verifier = cfg, repo, bus, verifier
         self.top_k, self.min_similarity, self.verify_above = top_k, min_similarity, verify_above
         self.max_postings = max_postings
@@ -385,6 +386,12 @@ class MarketMatcher:
         """Screen every candidate pair in memory; only pairs that pass deterministic validation
         (or that are already stored) touch the database or the rule verifier."""
         counts = {"candidates": 0, "verified": 0, "rejected": 0, "screened": 0}
+        structural = await self.save_structural(kalshi, poly)
+        for k, v in structural.items():
+            counts[k] += v
+        taken = set(self._structural_ids)
+        kalshi = [m for m in kalshi if m.market_id not in taken]
+        poly = [m for m in poly if m.market_id not in taken]
         known = {(r.kalshi_id, r.polymarket_id) for r in await self.repo.mapping_rows(
             ("verified", "candidate", "stale", "rejected"))}
         pairs = await asyncio.to_thread(self.candidates, kalshi, poly)
@@ -402,6 +409,33 @@ class MarketMatcher:
                 counts["candidates"] += 1
             else:
                 counts["rejected"] += 1
+        return counts
+
+    async def save_structural(self, kalshi: list[Market], poly: list[Market]) -> dict[str, int]:
+        """Crypto price contracts are matched field by field (asset, index, averaging, time,
+        strike, rounding). A pair that passes every check is settlement-compatible; it becomes
+        tradeable automatically only when auto_verify_structural is on."""
+        from .crypto_matcher import match_crypto
+        counts = {"candidates": 0, "verified": 0, "rejected": 0}
+        self._structural_ids = set()
+        for cm in match_crypto(kalshi, poly):
+            self._structural_ids |= {cm.kalshi.market_id, cm.poly.market_id}
+            existing = await self.repo.get_mapping_row(cm.kalshi.market_id, cm.poly.market_id)
+            if existing and existing.status == "rejected":
+                continue
+            if cm.compatible:
+                status = "verified" if (self.cfg.auto_verify_structural or (existing and existing.status == "verified")) \
+                    else "candidate"
+            else:
+                status = "rejected"
+            mid = await self.repo.save_mapping(cm.kalshi, cm.poly, inverted=False,
+                                               confidence=99.0 if cm.compatible else 40.0,
+                                               settlement_compatible=cm.compatible, status=status,
+                                               method="crypto-structural", checks=cm.checks)
+            counts["verified" if status == "verified" else "candidates" if cm.compatible else "rejected"] += 1
+            if existing is None and status == "verified":
+                await self.bus.publish(events.MAPPING_CHANGED, mapping_id=mid, status=status, confidence=99.0,
+                                       kalshi=cm.kalshi.title, polymarket=cm.poly.title, new=True)
         return counts
 
     # -- operator decisions -----------------------------------------------------
@@ -440,6 +474,12 @@ class MarketMatcher:
                 continue  # market left discovery (closed/settled); positions are tracked separately
             if rules_hash(k) != row.kalshi_rules_hash or rules_hash(p) != row.polymarket_rules_hash:
                 reason = "market terms changed since verification"
+            elif row.method == "crypto-structural":
+                from .crypto_matcher import compare, parse_kalshi, parse_poly
+                kc, pc = parse_kalshi(k), parse_poly(p)
+                cm = compare(k, kc, p, pc) if kc and pc else None
+                if cm is None or not cm.compatible:
+                    reason = "; ".join(cm.reasons) if cm else "contract no longer parses as a crypto threshold"
             elif row.method != "manual":
                 # operator approvals already accepted any deterministic differences; for those,
                 # only a change in the contracts themselves (above) reopens the question

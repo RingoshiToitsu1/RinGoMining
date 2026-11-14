@@ -332,3 +332,72 @@ async def test_slow_exchange_does_not_stall_the_other_feed(h):
     await asyncio.sleep(0.5)
     assert h.store.get(Exchange.POLYMARKET, "btc-100k-dec-31") is not None
     task.cancel()
+
+
+# ------------------------------------------------------- crypto matching / screening
+def _crypto_pair(strike="65250", kstrike="65249.99", asset="btc", rounding=2, hour="5:00PM", series="KXBTCD"):
+    from datetime import datetime, timezone
+    from arbbot.core.types import Market
+    inst = datetime(2026, 11, 14, 22, 0, tzinfo=timezone.utc)
+    idx = {"btc": "Bitcoin Real-Time Index (BRTI)", "xrp": "Ripple-Dollar Real Time Index (XRPUSD_RTI)"}[asset]
+    k = Market(Exchange.KALSHI, f"{series}-26NOV1417-T{kstrike}", "price on Nov 14", close_time=inst,
+               expiration_time=inst, event_id=f"{series}-26NOV1417",
+               rules=f"If the simple average of the sixty seconds of CF Benchmarks' {idx} before 5 PM EST is above "
+                     f"{kstrike} at 5 PM EST on Nov 14, 2026, then the market resolves to Yes.",
+               extra={"series_ticker": series, "strike_type": "greater", "floor_strike": float(kstrike)})
+    pre = "cpc" if asset == "btc" else f"cpc{asset}"
+    p = Market(Exchange.POLYMARKET, f"{pre}-{asset}-above-day-2026-11-14-{strike.replace('.', 'p')}", "price",
+               close_time=inst, expiration_time=inst,
+               rules=f"This market will settle to Yes if the price is at or above ${strike} at {hour} ET on Nov 14, "
+                     f"2026. Outcome sourced from CF Benchmarks' {idx}. In the last minute 60 prices are collected. "
+                     f"The official and final value is the simple average of these prices, rounded to the nearest "
+                     f"{rounding} decimal places.")
+    return k, p
+
+
+def test_crypto_matcher_accepts_identical_contracts_and_measures_the_edge():
+    from arbbot.core.crypto_matcher import match_crypto
+    k, p = _crypto_pair()
+    (m,) = match_crypto([k], [p])
+    assert m.compatible and m.checks["disagreement_window"] == "0.005" and m.checks["disagreement_prob_max"] < 1e-5
+
+
+def test_crypto_matcher_rejects_time_rounding_and_strike_mismatches():
+    from arbbot.core.crypto_matcher import match_crypto
+    k, p = _crypto_pair(hour="4:00PM")
+    assert not match_crypto([k], [p])                          # different settlement instant: no pair
+    k, p = _crypto_pair(strike="0.9", kstrike="0.8995", asset="xrp", rounding=5, series="KXXRPD")
+    (m,) = match_crypto([k], [p])                              # 0.05 cents apart on a $0.90 coin: too wide
+    assert not m.compatible and "strike edges differ" in m.reasons[0]
+    k, p = _crypto_pair()
+    p.rules = p.rules.replace("CF Benchmarks' Bitcoin Real-Time Index (BRTI)", "Coinbase spot price")
+    (m,) = match_crypto([k], [p])
+    assert not m.compatible and any("index" in r for r in m.reasons)
+
+
+async def test_structural_pairs_need_opt_in_to_trade_and_demote_on_rule_change(h):
+    k, p = _crypto_pair()
+    await h.repo.upsert_markets([k, p])
+    await h.matcher.run([k], [p])
+    (row,) = await h.repo.mapping_rows(("candidate",))
+    assert row.method == "crypto-structural" and row.settlement_compatible and row.confidence == 99
+    h.cfg.auto_verify_structural = True
+    await h.matcher.run([k], [p])
+    assert (await h.repo.get_mapping(row.id)).status == "verified"
+    p.rules = p.rules.replace("rounded to the nearest 2", "rounded to the nearest 0")
+    await h.repo.upsert_markets([p])
+    assert await h.matcher.revalidate({k.key: k, p.key: p}) == [row.id]
+
+
+async def test_screen_mode_finds_gap_from_quotes_and_paper_trades_it(h):
+    await h.add_mapping()
+    h.engine.screen_mode = True
+    h.books("0.50", "0.50")                     # no gap
+    await h.allocator.refresh_balances()
+    assert not await h.engine.screen_once()
+    assert h.engine.screen_stats["best_gross"] == 1
+    h.books("0.40", "0.50")                     # 10c gap
+    opps = await h.engine.screen_once()
+    assert any(o.evaluation.accepted for o in opps)
+    assert h.engine.screen_stats["deep"] == 1
+    assert len(await h.repo.open_positions("paper")) == 1

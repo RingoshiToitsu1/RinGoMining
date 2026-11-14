@@ -22,8 +22,8 @@ SETTING_GROUPS = {
              "unwind_floor_pct", "fee_discrepancy_tolerance_pct"],
     "costs": ["kalshi_latency_ms", "polymarket_latency_ms", "base_slippage_bps", "base_leg_fail_prob",
               "usdc_conversion_bps", "capital_cost_apr_pct", "settlement_risk_bps", "operational_risk_bps"],
-    "matching": ["min_match_confidence", "close_time_tolerance_hours", "revalidate_hours"],
-    "loops": ["scan_interval_s", "book_poll_interval_s", "discovery_interval_s", "settlement_check_interval_s",
+    "matching": ["auto_verify_structural", "min_match_confidence", "close_time_tolerance_hours", "revalidate_hours"],
+    "loops": ["scan_interval_s", "screen_interval_s", "screen_max_deep", "book_poll_interval_s", "discovery_interval_s", "settlement_check_interval_s",
               "notify_opportunities", "daily_summary_hour_utc", "max_watched_candidates"],
     "paper": ["paper_kalshi_balance", "paper_polymarket_balance", "paper_fail_prob", "paper_partial_prob",
               "paper_min_days", "paper_min_trades", "paper_min_net_pnl", "paper_max_fail_rate_pct"],
@@ -48,19 +48,29 @@ async def _set(app: "App", key: str, raw: str) -> str:
 
 
 async def scan(app: "App", args: list[str], user: str) -> Reply:
-    for ex in list(app.venues):
-        try:
-            await app.feed.poll_once(ex)
-        except Exception as err:
-            return Reply(f"Could not refresh {ex.value} order books: {e(err, 200)}")
     await app.allocator.refresh_balances()
-    opps = await app.engine.scan_once()
+    if app.engine.screen_mode:
+        try:
+            opps = await app.engine.screen_once()
+        except Exception as err:
+            return Reply(f"Could not fetch quotes: {e(err, 200)}")
+    else:
+        for ex in list(app.venues):
+            try:
+                await app.feed.poll_once(ex)
+            except Exception as err:
+                return Reply(f"Could not refresh {ex.value} order books: {e(err, 200)}")
+        opps = await app.engine.scan_once()
     ok = [o for o in opps if o.evaluation.accepted]
     best = max((o.evaluation.quote.roi for o in opps if o.evaluation.quote), default=None)
     text = (f"Scanned {len(app.engine.mappings)} mapped pairs: <b>{len(ok)}</b> qualifying, "
             f"{len(opps) - len(ok)} evaluated and rejected.")
     if best is not None:
         text += f" Best net return seen: {pct(best * 100)}."
+    st = app.engine.screen_stats if app.engine.screen_mode else {}
+    if st.get("best_gross") is not None:
+        text += (f"\nScreened {st['quoted']} pairs by quote, {st['deep']} with full books. Cheapest pair: "
+                 f"${st['best_gross']:.4f} per $1 payout ({e(st['best_pair'], 160)}).")
     if not app.engine.mappings:
         text += "\nNo market mappings yet. Discovery runs in the background; review matches with /mappings."
     return Reply(text, [[("Show opportunities", "opportunities")]])

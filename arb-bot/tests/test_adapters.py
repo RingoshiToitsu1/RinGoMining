@@ -36,7 +36,7 @@ EVENT = {"event_ticker": "KXBTC-26DEC31", "series_ticker": "KXBTC", "title": "Bi
 
 def kalshi(handler, **kw):
     s = Settings(_env_file=None, kalshi_api_key_id="key-1", kalshi_private_key_pem=PEM,
-                 kalshi_eligibility_confirmed=True, discovery_max_days_to_close=4000, **kw)
+                 kalshi_eligibility_confirmed=True, discovery_max_days_to_close=4000, discovery_scope="all", **kw)
     return KalshiAdapter(s, transport=httpx.MockTransport(handler))
 
 
@@ -200,7 +200,7 @@ class FakeUS:
 async def test_polymarket_us_adapter():
     fake = FakeUS()
     s = Settings(_env_file=None, polymarket_us_key_id="k", polymarket_us_secret_key="c2VjcmV0",
-                 polymarket_eligibility_confirmed=True, discovery_max_days_to_close=4000)
+                 polymarket_eligibility_confirmed=True, discovery_max_days_to_close=4000, discovery_scope="all")
     us = PolymarketUSAdapter(s, client=fake)
     m = (await us.list_markets())[0]
     assert m.market_id == "btc-100k" and m.close_time.year == 2026 and m.exchange is Exchange.POLYMARKET

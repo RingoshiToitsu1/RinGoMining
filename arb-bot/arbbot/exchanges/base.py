@@ -66,6 +66,12 @@ class ExchangeAdapter(ABC):
             out[m.market_id] = await self.get_orderbook(m)
         return out
 
+    async def get_quotes(self, markets: list[Market]) -> dict[str, tuple[Decimal | None, Decimal | None]]:
+        """Top of book for many markets at once: {market_id: (best YES bid, best YES ask)}.
+        Adapters override this with a bulk endpoint; it is only a screen, never a fill price."""
+        books = await self.get_orderbooks(markets)
+        return {mid: (b.best_bid(Outcome.YES), b.best_ask(Outcome.YES)) for mid, b in books.items()}
+
     async def stream_orderbooks(self, markets: list[Market], on_book: BookCallback) -> None:
         raise NotImplementedError
 

@@ -49,6 +49,8 @@ class ArbitrageEngine:
         self._logged: dict[tuple[int, str], tuple[str, float, int]] = {}   # dedupe of journaled evaluations
         self._notified: dict[tuple[int, str], float] = {}
         self._scan_lock = asyncio.Lock()
+        self.screen_mode = False
+        self.screen_stats: dict = {}
 
     # -- mappings -------------------------------------------------------------
     async def reload_mappings(self) -> None:
@@ -57,10 +59,15 @@ class ArbitrageEngine:
         # verified pairs are traded and always watched; unverified candidates only feed the
         # review screen, so only the most promising few get order books (exchange rate limits)
         markets = []
-        candidates = sorted((m for m in self.mappings if m.status == "candidate" and m.confidence >= 60),
+        if self.screen_mode:
+            # screening fetches quotes in bulk; only open positions need continuously polled books
+            candidates = []
+            self.feed.watch([])
+        candidates = [] if self.screen_mode else sorted((m for m in self.mappings if m.status == "candidate" and m.confidence >= 60),
                             key=lambda m: -m.confidence)[: self.cfg.max_watched_candidates]
-        for m in [m for m in self.mappings if m.status == "verified"] + candidates:
-            markets += [m.kalshi, m.polymarket]
+        if not self.screen_mode:
+            for m in [m for m in self.mappings if m.status == "verified"] + candidates:
+                markets += [m.kalshi, m.polymarket]
         # markets behind open positions must stay watched too (for marks and closes)
         for p in await self.repo.open_positions(self.cfg.mode):
             for ex, mid in ((p.a_exchange, p.a_market_id), (p.b_exchange, p.b_market_id)):
@@ -123,6 +130,7 @@ class ArbitrageEngine:
         self._logged[key] = (sig, now, opp.opportunity_id)
 
     async def scan_once(self, execute: bool = True) -> list[Opportunity]:
+        """Evaluate every mapping from the books already in the store (books mode)."""
         async with self._scan_lock:
             opps: list[Opportunity] = []
             for m in self.mappings:
@@ -130,44 +138,105 @@ class ArbitrageEngine:
                     opps.extend(await self.evaluate_mapping(m))
                 except Exception:
                     log.exception("evaluation failed for mapping %s", m.id)
-            opps.sort(key=lambda o: (o.evaluation.accepted, o.evaluation.score,
-                                     o.evaluation.quote.roi if o.evaluation.quote else -1), reverse=True)
-            for o in opps:
-                await self._record(o)
-            self.latest, self.last_scan_ts = opps, time.time()
-            self.scans += 1
-            accepted = [o for o in opps if o.evaluation.accepted]
-            now = time.time()
-            for o in accepted:
-                key = (o.mapping.id, o.direction)
-                if self.cfg.notify_opportunities and now - self._notified.get(key, 0) > 600:
-                    self._notified[key] = now
-                    q = o.evaluation.quote
-                    await self.bus.publish(events.OPPORTUNITY, title=o.mapping.kalshi.title, direction=o.direction,
-                                           size=q.size, net=q.net, roi_pct=q.roi * 100,
-                                           required_pct=o.evaluation.required_roi * 100, capital=q.capital,
-                                           confidence=o.mapping.confidence, mapping_id=o.mapping.id)
-            if execute and self.cfg.autotrade and accepted:
-                ok, _ = self.risk.trading_allowed()
-                if ok:
-                    # best risk-adjusted opportunity first; each execution re-validates on fresh
-                    # books and re-sizes against the capital that is actually left
-                    for o in accepted[:3]:
-                        if not self.risk.trading_allowed()[0]:
-                            break
-                        await self.execution.execute(o.mapping, o.kalshi_outcome, o.opportunity_id)
-                        self._logged.pop((o.mapping.id, o.direction), None)
-            return opps
+            return await self._finish(opps, execute)
+
+    @staticmethod
+    def _ask(q: tuple, outcome: Outcome) -> Decimal | None:
+        bid, ask = q
+        if outcome is Outcome.YES:
+            return ask
+        return Decimal(1) - bid if bid is not None else None
+
+    async def screen_once(self, execute: bool = True) -> list[Opportunity]:
+        """Screen mode: bulk top-of-book quotes for every pair (a handful of requests), then full
+        order books and the real evaluation only for pairs whose quotes cost less than $1."""
+        async with self._scan_lock:
+            maps = [m for m in self.mappings if m.status in ("verified", "candidate")]
+            stats = {"pairs": len(maps), "quoted": 0, "deep": 0, "best_gross": None, "best_pair": ""}
+            if not maps:
+                self.screen_stats = stats
+                return await self._finish([], execute)
+            kmk = list({m.kalshi.market_id: m.kalshi for m in maps}.values())
+            pmk = list({m.polymarket.market_id: m.polymarket for m in maps}.values())
+            kq, pq = await asyncio.gather(self.venues[Exchange.KALSHI].get_quotes(kmk),
+                                          self.venues[Exchange.POLYMARKET].get_quotes(pmk))
+            gaps: list[tuple[Decimal, Mapping]] = []
+            for m in maps:
+                a, b = kq.get(m.kalshi.market_id), pq.get(m.polymarket.market_id)
+                if not a or not b:
+                    continue
+                stats["quoted"] += 1
+                best = None
+                for k_out in (Outcome.YES, Outcome.NO):
+                    ka, pa = self._ask(a, k_out), self._ask(b, m.poly_outcome_for(k_out).opposite)
+                    if ka is not None and pa is not None:
+                        g = ka + pa
+                        best = g if best is None else min(best, g)
+                        if stats["best_gross"] is None or g < stats["best_gross"]:
+                            stats["best_gross"] = g
+                            p_out = m.poly_outcome_for(k_out).opposite
+                            stats["best_pair"] = (f"{m.kalshi.market_id} {k_out.value.upper()} @ {ka} + "
+                                                  f"{m.polymarket.market_id} {p_out.value.upper()} @ {pa}")
+                if best is not None and best < 1:
+                    gaps.append((best, m))
+            gaps.sort(key=lambda x: x[0])
+            opps: list[Opportunity] = []
+            for _, m in gaps[: self.cfg.screen_max_deep]:
+                try:
+                    bk, bp = await asyncio.gather(self.venues[Exchange.KALSHI].get_orderbook(m.kalshi),
+                                                  self.venues[Exchange.POLYMARKET].get_orderbook(m.polymarket))
+                except Exception as e:
+                    log.warning("order books for mapping %s unavailable: %s", m.id, str(e)[:160])
+                    continue
+                await self.store.put_async(bk)
+                await self.store.put_async(bp)
+                stats["deep"] += 1
+                opps.extend(await self.evaluate_mapping(m))
+            self.screen_stats = stats
+            return await self._finish(opps, execute)
+
+    async def _finish(self, opps: list[Opportunity], execute: bool) -> list[Opportunity]:
+        opps.sort(key=lambda o: (o.evaluation.accepted, o.evaluation.score,
+                                 o.evaluation.quote.roi if o.evaluation.quote else -1), reverse=True)
+        for o in opps:
+            await self._record(o)
+        self.latest, self.last_scan_ts = opps, time.time()
+        self.scans += 1
+        accepted = [o for o in opps if o.evaluation.accepted]
+        now = time.time()
+        for o in accepted:
+            key = (o.mapping.id, o.direction)
+            if self.cfg.notify_opportunities and now - self._notified.get(key, 0) > 600:
+                self._notified[key] = now
+                q = o.evaluation.quote
+                await self.bus.publish(events.OPPORTUNITY, title=o.mapping.kalshi.title, direction=o.direction,
+                                       size=q.size, net=q.net, roi_pct=q.roi * 100,
+                                       required_pct=o.evaluation.required_roi * 100, capital=q.capital,
+                                       confidence=o.mapping.confidence, mapping_id=o.mapping.id)
+        if execute and self.cfg.autotrade and accepted:
+            ok, _ = self.risk.trading_allowed()
+            if ok:
+                # best risk-adjusted opportunity first; each execution re-validates on fresh
+                # books and re-sizes against the capital that is actually left
+                for o in accepted[:3]:
+                    if not self.risk.trading_allowed()[0]:
+                        break
+                    await self.execution.execute(o.mapping, o.kalshi_outcome, o.opportunity_id)
+                    self._logged.pop((o.mapping.id, o.direction), None)
+        return opps
 
     async def run(self) -> None:
         while True:
             try:
-                await self.scan_once()
+                if self.screen_mode:
+                    await self.screen_once()
+                else:
+                    await self.scan_once()
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                log.exception("scan failed")
-            await asyncio.sleep(self.cfg.scan_interval_s)
+            except Exception as e:
+                log.warning("scan failed: %s", str(e)[:200])
+            await asyncio.sleep(self.cfg.screen_interval_s if self.screen_mode else self.cfg.scan_interval_s)
 
     # -- settlement -------------------------------------------------------------
     async def settle_once(self) -> int:

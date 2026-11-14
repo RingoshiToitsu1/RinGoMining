@@ -92,6 +92,7 @@ class App:
         self.risk._busy = lambda: self.execution.busy
         self.engine = ArbitrageEngine(cfg, self.repo, self.bus, self.venues, self.store, self.feed,
                                       self.allocator, self.risk, self.execution)
+        self.engine.screen_mode = s.scan_mode == "screen"
         verifier = None
         if s.anthropic_api_key:
             from .core.llm_verifier import ClaudeRuleVerifier
