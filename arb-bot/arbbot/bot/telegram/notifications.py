@@ -62,6 +62,7 @@ class Notifier:
     def __init__(self, bus: EventBus, send: Sender):
         self._send = send
         self._last: dict[str, float] = {}
+        self._pending_verified: list[dict] = []
         bus.subscribe(events.OPPORTUNITY, self.on_opportunity)
         bus.subscribe(events.TRADE_COMPLETED, self.on_trade)
         bus.subscribe(events.PARTIAL_FILL, self.on_partial)
@@ -71,6 +72,7 @@ class Notifier:
         bus.subscribe(events.RISK_ALERT, self.on_risk)
         bus.subscribe(events.POSITION_SETTLED, self.on_settled)
         bus.subscribe(events.MAPPING_CHANGED, self.on_mapping)
+        bus.subscribe(events.MARKETS_DISCOVERED, self.on_discovered)
         bus.subscribe(events.DAILY_SUMMARY, self.on_summary)
 
     async def send(self, text: str, throttle_key: str = "", min_gap: float = 0.0) -> None:
@@ -145,12 +147,23 @@ class Notifier:
     async def on_mapping(self, ev: Event) -> None:
         d = ev.data
         if d["status"] == "verified":
+            # structural matches arrive in batches of dozens: one line each would flood the chat
+            self._pending_verified.append(d)
+            if len(self._pending_verified) > 1:
+                return
             await self.send(f"🔗 <b>Market pair verified</b> #{d['mapping_id']} (confidence {d['confidence']:.0f})\n"
                             f"{e(d['kalshi'], 100)}\n↔ {e(d['polymarket'], 100)}")
         elif d.get("new") and d["confidence"] >= 75:
             await self.send(f"🟡 <b>Possible match needs review</b> #{d['mapping_id']} "
                             f"(confidence {d['confidence']:.0f})\n{e(d['kalshi'], 100)}\n↔ {e(d['polymarket'], 100)}\n"
                             f"/mappings show {d['mapping_id']}", "mapping", 20)
+
+    async def on_discovered(self, ev: Event) -> None:
+        batch, self._pending_verified = self._pending_verified, []
+        if len(batch) > 1:
+            await self.send(f"🔗 <b>{len(batch)} market pairs verified</b> and now eligible for trading\n"
+                            + "\n".join(f"#{d['mapping_id']} {e(d['polymarket'], 80)}" for d in batch[:12])
+                            + (f"\n…and {len(batch) - 12} more (/mappings verified)" if len(batch) > 12 else ""))
 
     async def on_summary(self, ev: Event) -> None:
         await self.send(summary_message(ev.data["dashboard"]))
