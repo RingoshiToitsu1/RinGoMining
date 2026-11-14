@@ -11,9 +11,8 @@ from arbbot.bot.telegram.notifications import Notifier
 from arbbot.config.runtime import RuntimeConfig
 from arbbot.config.settings import Settings
 from arbbot.core.types import Exchange, OrderRequest, Outcome, Side, TIF
-from arbbot.database.repo import Repository
 from arbbot.exchanges.sim import PaperExchange, SimExchange
-from tests.conftest import kalshi_market, poly_market
+from tests.conftest import fresh_cache, fresh_repo, kalshi_market, poly_market
 
 D = Decimal
 
@@ -47,8 +46,8 @@ async def make_app(repo=None, tmp_path=None):
     real[Exchange.POLYMARKET].add_market(p)
     real[Exchange.KALSHI].set_book(k.market_id, yes_bids=[("0.38", 300)], yes_asks=[("0.40", 300)])
     real[Exchange.POLYMARKET].set_book(p.market_id, yes_bids=[("0.50", 300)], yes_asks=[("0.52", 300)])
-    repo = repo or Repository(s.database_url)
-    app = App(s, repo=repo, data_adapters=real)
+    repo = repo or await fresh_repo()
+    app = App(s, repo=repo, data_adapters=real, cache=fresh_cache())
     await app.init()
     return app, real
 
@@ -68,6 +67,8 @@ async def app(tmp_path):
         px.latency_s = px.fail_prob = px.partial_prob = 0
     a.cfg.paper_fail_prob = a.cfg.paper_partial_prob = 0
     yield a
+    a.recorder.close()
+    await a.cache.close()
     await a.repo.close()
 
 
@@ -190,6 +191,8 @@ async def test_restart_restores_config_paper_account_and_positions(tmp_path):
     assert len(await app2.repo.open_positions("paper")) == 1
     assert app2.risk.trading_allowed()[0]                           # journal and paper account reconcile
     assert len(app2.engine.mappings) == 1
+    app1.recorder.close()
+    app2.recorder.close()
     await app1.repo.close()
 
 

@@ -8,3 +8,4 @@ var/
 .ruff_cache/
 *.egg-info/
 *.pem
+secrets/

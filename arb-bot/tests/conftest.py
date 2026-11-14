@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -34,6 +35,27 @@ def poly_market(mid: str = "btc-100k-dec-31", title: str = "Bitcoin above $100,0
     return Market(Exchange.POLYMARKET, mid, title, close_time=CLOSE, expiration_time=CLOSE,
                   rules="Resolves Yes if the CF Benchmarks Bitcoin price is above 100000.",
                   fee=FeeSpec("notional_bps", D("0.001")))
+
+
+async def fresh_repo() -> Repository:
+    """SQLite in memory by default; set TEST_DATABASE_URL to run the suite on PostgreSQL."""
+    url = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    repo = Repository(url)
+    if not url.startswith("sqlite"):
+        from arbbot.database.models import Base
+        async with repo.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+    await repo.create_all()
+    return repo
+
+
+def fresh_cache():
+    """In-process by default; set TEST_REDIS_URL to run locks and caching on Redis."""
+    url = os.environ.get("TEST_REDIS_URL", "")
+    if not url:
+        return MemoryCache()
+    from arbbot.infra.cache import RedisCache
+    return RedisCache(url, prefix=f"arbbot-test-{os.getpid()}-{id(object())}:")
 
 
 @dataclass
@@ -94,8 +116,7 @@ async def h() -> Harness:
     cfg = RuntimeConfig(kalshi_allocation=D("1000"), polymarket_allocation=D("1000"), autotrade=True,
                         max_trade_usd=D("200"), max_unhedged_usd=D("200"), max_unhedged_seconds=0.3,
                         max_execution_seconds=5, notify_opportunities=True)
-    repo = Repository("sqlite+aiosqlite:///:memory:")
-    await repo.create_all()
+    repo = await fresh_repo()
     bus = EventBus()
     seen: list[Event] = []
 
@@ -107,7 +128,7 @@ async def h() -> Harness:
     kalshi = SimExchange(Exchange.KALSHI, D("1000"), seed=1)
     poly = SimExchange(Exchange.POLYMARKET, D("1000"), seed=2)
     venues = {Exchange.KALSHI: kalshi, Exchange.POLYMARKET: poly}
-    cache = MemoryCache()
+    cache = fresh_cache()
     store = OrderBookStore(cache)
     feed = BookFeed(venues, store, bus, lambda: 0.01)
     profit = ProfitabilityEngine(cfg)
@@ -120,4 +141,5 @@ async def h() -> Harness:
     harness = Harness(cfg, repo, bus, kalshi, poly, venues, store, feed, profit, allocator, risk, execution,
                       engine, matcher, seen)
     yield harness
+    await cache.close()
     await repo.close()

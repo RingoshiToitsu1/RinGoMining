@@ -181,6 +181,7 @@ class Repository:
         async with self.session() as s:
             row.plan = jsonable(row.plan)
             s.add(row)
+            await s.flush()          # the execution must exist before its first journal entry (FK)
             s.add(ExecutionEventRow(execution_id=row.id, seq=0, state=row.state, payload={}))
             await s.commit()
 

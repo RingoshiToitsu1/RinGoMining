@@ -1,0 +1,56 @@
+# Production stack: bot + PostgreSQL (source of truth) + Redis (book cache, locks).
+#   cp .env.example .env   # fill it in
+#   docker compose -f deployment/docker-compose.yml up -d --build
+#   docker compose -f deployment/docker-compose.yml logs -f bot
+name: arbbot
+
+services:
+  bot:
+    build:
+      context: ..
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://arbbot:${POSTGRES_PASSWORD:-arbbot}@postgres:5432/arbbot
+      REDIS_URL: redis://redis:6379/0
+      DATA_DIR: /data
+    volumes:
+      - botdata:/data
+      - ../secrets:/secrets:ro        # put kalshi.pem here (chmod 600); never commit it
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 60s            # let an in-flight execution finish its hedge
+    logging:
+      options: { max-size: "20m", max-file: "5" }
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: arbbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arbbot}
+      POSTGRES_DB: arbbot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arbbot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  botdata:
