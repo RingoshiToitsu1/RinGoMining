@@ -129,6 +129,8 @@ class KalshiAdapter(ExchangeAdapter):
                 raise ExchangeUnavailable(f"kalshi {method} {path}: HTTP {r.status_code} {r.text[:200]}")
             if r.status_code >= 400:
                 raise ExchangeError(f"kalshi {method} {path}: HTTP {r.status_code} {r.text[:300]}")
+            if method == "GET":
+                self._read_limiter.success()
             return r.json() if r.content else {}
 
     # -- eligibility / health ----------------------------------------------------

@@ -38,13 +38,17 @@ def rules_headline(desc: str) -> str:
     return (first[:1].upper() + first[1:])[:200] if len(first.split()) >= 4 else ""
 
 
+def _short(e: Exception) -> str:
+    text = re.sub(r"<[^>]+>", " ", str(e))
+    return re.sub(r"\s+", " ", text).strip()[:200]
+
+
 def _amount(a: Any) -> Decimal:
     return D(a.get("value")) if isinstance(a, dict) else D(a)
 
 
 class PolymarketUSAdapter(ExchangeAdapter):
     name = Exchange.POLYMARKET
-    supports_streaming = False       # REST polling; books are refreshed again before every execution
 
     def __init__(self, settings: Settings, client: Any = None):
         self.s = settings
@@ -63,23 +67,37 @@ class PolymarketUSAdapter(ExchangeAdapter):
     async def close(self) -> None:
         await self.c.close()
 
-    async def _call(self, coro: Any, *, write: bool = False) -> Any:
+    async def _call(self, make: Any, *, write: bool = False, retries: int = 3) -> Any:
+        """`make` is a zero-argument callable returning the SDK coroutine, so reads can be retried
+        after a 429. Error text is shortened: rate-limit responses are full HTML pages."""
         from polymarket_us import errors as E
-        if not write:
-            await self._read_limiter.acquire()
-        try:
-            return await coro
-        except E.RateLimitError as e:
-            self._read_limiter.penalize(5.0)
-            raise ExchangeUnavailable(f"polymarket-us: {e}") from e
-        except (E.APIConnectionError, E.InternalServerError) as e:
-            raise ExchangeUnavailable(f"polymarket-us: {e}") from e
-        except E.APIStatusError as e:
-            raise ExchangeError(f"polymarket-us: {e}") from e
-        except E.PolymarketUSError as e:
-            if write:
-                raise ExchangeUnavailable(f"polymarket-us: {e}") from e
-            raise ExchangeError(f"polymarket-us: {e}") from e
+        attempt = 0
+        while True:
+            if not write:
+                await self._read_limiter.acquire()
+            try:
+                out = await (make() if callable(make) else make)
+                if not write:
+                    self._read_limiter.success()
+                return out
+            except E.RateLimitError as e:
+                self._read_limiter.penalize(5.0)
+                if not write and callable(make) and attempt < retries:
+                    attempt += 1
+                    continue
+                raise ExchangeUnavailable("polymarket-us: rate limited (HTTP 429)") from e
+            except (E.APIConnectionError, E.InternalServerError) as e:
+                if not write and callable(make) and attempt < retries:
+                    attempt += 1
+                    await asyncio.sleep(0.5 * attempt)
+                    continue
+                raise ExchangeUnavailable(f"polymarket-us: {_short(e)}") from e
+            except E.APIStatusError as e:
+                raise ExchangeError(f"polymarket-us: {_short(e)}") from e
+            except E.PolymarketUSError as e:
+                if write:
+                    raise ExchangeUnavailable(f"polymarket-us: {_short(e)}") from e
+                raise ExchangeError(f"polymarket-us: {_short(e)}") from e
 
     @property
     def _has_creds(self) -> bool:
@@ -92,7 +110,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
                 "set POLYMARKET_ELIGIBILITY_CONFIRMED=true once verified")
         rep.add("API credentials configured", self._has_creds, "create keys at polymarket.us/developer")
         try:
-            await self._call(self.c.markets.list({"limit": 1, "active": True}))
+            await self._call(lambda: self.c.markets.list({"limit": 1, "active": True}))
             rep.add("market data reachable", True)
         except ExchangeError as e:
             rep.add("market data reachable", False, str(e)[:160])
@@ -100,7 +118,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
             try:
                 bal = await self.get_balance()
                 rep.add("authenticated account access", True, f"buying power ${bal.available}")
-                await self._call(self.c.orders.list())
+                await self._call(lambda: self.c.orders.list())
                 rep.add("order API permission", True)
             except ExchangeError as e:
                 rep.add("authenticated account access", False, str(e)[:160])
@@ -109,7 +127,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
 
     async def health(self) -> bool:
         try:
-            await self._call(self.c.markets.list({"limit": 1, "active": True}))
+            await self._call(lambda: self.c.markets.list({"limit": 1, "active": True}))
             return True
         except ExchangeError:
             return False
@@ -166,8 +184,8 @@ class PolymarketUSAdapter(ExchangeAdapter):
         horizon = datetime.now(timezone.utc) + timedelta(days=self.s.discovery_max_days_to_close)
         out: list[Market] = []
         for offset in range(0, 100000, 100):
-            page = (await self._call(self.c.markets.list(
-                {"active": True, "closed": False, "limit": 100, "offset": offset}))).get("markets") or []
+            page = (await self._call(lambda o=offset: self.c.markets.list(
+                {"active": True, "closed": False, "limit": 100, "offset": o}))).get("markets") or []
             for m in page:
                 mk = self._market(m)
                 if mk and mk.status == "open" and mk.close_time and mk.close_time <= horizon \
@@ -179,7 +197,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
 
     async def get_market(self, market_id: str) -> Market | None:
         try:
-            m = (await self._call(self.c.markets.retrieve_by_slug(market_id))).get("market")
+            m = (await self._call(lambda: self.c.markets.retrieve_by_slug(market_id))).get("market")
         except ExchangeUnavailable:
             raise
         except ExchangeError:
@@ -187,26 +205,70 @@ class PolymarketUSAdapter(ExchangeAdapter):
         return self._market(m) if m else None
 
     # -- order books -----------------------------------------------------------------
-    async def get_orderbook(self, market: Market) -> OrderBook:
-        data = (await self._call(self.c.markets.book(market.market_id))).get("marketData") or {}
+    def _book(self, slug: str, data: dict, source: str = "rest") -> OrderBook:
         if data.get("state") not in (None, "MARKET_STATE_OPEN"):
-            return OrderBook(self.name, market.market_id)       # halted/closed: nothing executable
+            return OrderBook(self.name, slug, source=source)      # halted/closed: nothing executable
         bids = [Level(_amount(x["px"]), D(x["qty"])) for x in data.get("bids") or []]
         asks = [Level(_amount(x["px"]), D(x["qty"])) for x in data.get("offers") or []]
-        return OrderBook.from_single_book(self.name, market.market_id, bids, asks)
+        book = OrderBook.from_single_book(self.name, slug, bids, asks)
+        book.source = source
+        return book
+
+    async def get_orderbook(self, market: Market) -> OrderBook:
+        data = (await self._call(lambda: self.c.markets.book(market.market_id))).get("marketData") or {}
+        return self._book(market.market_id, data)
 
     async def get_orderbooks(self, markets: list[Market]) -> dict[str, OrderBook]:
-        sem = asyncio.Semaphore(8)
+        """Best effort: markets whose book could not be fetched are left out (they are simply
+        not evaluated this round). Raises only if nothing at all could be fetched."""
+        sem = asyncio.Semaphore(4)
 
         async def one(m: Market) -> tuple[str, OrderBook]:
             async with sem:
                 return m.market_id, await self.get_orderbook(m)
 
-        return dict(await asyncio.gather(*(one(m) for m in markets)))
+        results = await asyncio.gather(*(one(m) for m in markets), return_exceptions=True)
+        out = dict(r for r in results if not isinstance(r, BaseException))
+        errors = [r for r in results if isinstance(r, BaseException)]
+        if markets and not out and errors:
+            raise errors[0] if isinstance(errors[0], ExchangeError) else ExchangeUnavailable(str(errors[0])[:200])
+        return out
+
+    @property
+    def supports_streaming(self) -> bool:      # the market-data socket needs API keys
+        return self._has_creds
+
+    async def stream_orderbooks(self, markets: list[Market], on_book: Any) -> None:
+        """Authenticated market-data WebSocket: full book snapshots per market. One connection
+        replaces hundreds of REST polls. Returns or raises when the socket drops; the feed reconnects."""
+        if not self._has_creds:
+            raise NotImplementedError
+        ws = self.c.ws.markets()
+        queue: asyncio.Queue = asyncio.Queue()
+        ws.on("market_data", lambda msg: queue.put_nowait(("data", msg)))
+        ws.on("error", lambda err: queue.put_nowait(("error", err)))
+        ws.on("close", lambda *a: queue.put_nowait(("close", None)))
+        await ws.connect()
+        try:
+            slugs = [m.market_id for m in markets]
+            for n, i in enumerate(range(0, len(slugs), 100)):
+                await ws.subscribe_market_data(f"books-{n}", slugs[i:i + 100])
+            while True:
+                kind, msg = await queue.get()
+                if kind == "data":
+                    data = msg.get("marketData") or {}
+                    if data.get("marketSlug"):
+                        await on_book(self._book(data["marketSlug"], data, source="ws"))
+                elif kind == "error":
+                    raise ExchangeUnavailable(f"polymarket-us ws: {_short(msg)}")
+                else:
+                    return
+        finally:
+            await ws.close()
 
     async def get_resolution(self, market: Market) -> tuple[Resolution, Decimal] | None:
         try:
-            data = await self._call(self.c.markets.settlement(market.market_id))
+            data = await self._call(lambda: self.c.markets.settlement(market.market_id))
         except ExchangeUnavailable:
             raise
         except ExchangeError:
@@ -224,7 +286,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
     async def get_balance(self) -> Balance:
         if not self._has_creds:
             raise TradingDisabled("Polymarket US credentials are not configured")
-        bals = (await self._call(self.c.account.balances())).get("balances") or []
+        bals = (await self._call(lambda: self.c.account.balances())).get("balances") or []
         if not bals:
             raise ExchangeError("polymarket-us: no balances returned")
         b = bals[0]
@@ -237,7 +299,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
             params: dict[str, Any] = {"limit": 100}
             if cursor:
                 params["cursor"] = cursor
-            data = await self._call(self.c.portfolio.positions(params))
+            data = await self._call(lambda p=params: self.c.portfolio.positions(p))
             for slug, p in (data.get("positions") or {}).items():
                 qty = D(p.get("netPositionDecimal") or p.get("netPosition"))
                 slug = (p.get("marketMetadata") or {}).get("slug") or slug
@@ -251,7 +313,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
         return out
 
     async def get_open_orders(self) -> list[dict]:
-        orders = (await self._call(self.c.orders.list())).get("orders") or []
+        orders = (await self._call(lambda: self.c.orders.list())).get("orders") or []
         return [{"order_id": o["id"], "market_id": o.get("marketSlug", "")} for o in orders]
 
     # -- trading ---------------------------------------------------------------------
@@ -294,7 +356,7 @@ class PolymarketUSAdapter(ExchangeAdapter):
             if delay:
                 await asyncio.sleep(delay)
             try:
-                o = (await self._call(self.c.orders.retrieve(order_id))).get("order") or {}
+                o = (await self._call(lambda: self.c.orders.retrieve(order_id))).get("order") or {}
             except ExchangeError as e:
                 log.warning("polymarket-us order %s lookup failed: %s", order_id, e)
                 continue
@@ -306,13 +368,13 @@ class PolymarketUSAdapter(ExchangeAdapter):
         # still working after ~7s: an IOC should never rest; cancel and report what filled
         try:
             await self.cancel_order(order_id, req.market)
-            o = (await self._call(self.c.orders.retrieve(order_id))).get("order") or {}
+            o = (await self._call(lambda: self.c.orders.retrieve(order_id))).get("order") or {}
             return self._result(o, req, req.outcome, req.size)
         except ExchangeError as e:
             raise ExchangeUnavailable(f"polymarket-us order {order_id} not terminal: {e}") from e
 
     async def get_order(self, order_id: str, market: Market) -> OrderResult:
-        o = (await self._call(self.c.orders.retrieve(order_id))).get("order") or {}
+        o = (await self._call(lambda: self.c.orders.retrieve(order_id))).get("order") or {}
         outcome = Outcome.NO if "SHORT" in o.get("intent", "") else Outcome.YES
         return self._result(o, None, outcome, D(o.get("quantity")))
 
