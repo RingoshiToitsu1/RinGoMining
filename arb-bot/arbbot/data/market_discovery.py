@@ -3,7 +3,6 @@ persist them, generate and validate cross-exchange matches, and revalidate
 existing mappings."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Awaitable, Callable
@@ -40,9 +39,9 @@ class MarketDiscovery:
         if kalshi is not None and poly is not None:
             fresh = {m.key: m for m in kalshi + poly}
             counts["demoted"] = len(await self.matcher.revalidate(fresh))
-            pairs = await asyncio.to_thread(self.matcher.candidates, kalshi, poly)
             enriched: dict[str, Market] = {}
-            for k, p, sim in pairs:
+
+            async def prepare(p: Market) -> Market:
                 if p.market_id not in enriched:
                     try:
                         enriched[p.market_id] = await self.venues[Exchange.POLYMARKET].enrich_market(p)
@@ -50,17 +49,11 @@ class MarketDiscovery:
                     except Exception as e:
                         log.warning("enrich failed for %s: %s", p.market_id, e)
                         enriched[p.market_id] = p
-                try:
-                    _, res = await self.matcher.evaluate_pair(k, enriched[p.market_id], sim)
-                except Exception:
-                    log.exception("matching failed for %s / %s", k.market_id, p.market_id)
-                    continue
-                if res.settlement_compatible and res.confidence >= self.matcher.cfg.min_match_confidence:
-                    counts["verified"] += 1
-                elif res.deterministic_ok:
-                    counts["candidates"] += 1
-                else:
-                    counts["rejected"] += 1
+                return enriched[p.market_id]
+
+            t0 = time.time()
+            counts.update(await self.matcher.run(kalshi, poly, prepare))
+            log.info("matching took %.0fs: %s", time.time() - t0, counts)
         self.last_run, self.last_counts = time.time(), counts
         await self._on_change()
         await self.bus.publish(events.MARKETS_DISCOVERED, **counts)

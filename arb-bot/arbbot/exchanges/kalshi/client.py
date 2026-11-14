@@ -185,7 +185,9 @@ class KalshiAdapter(ExchangeAdapter):
         return Market(
             Exchange.KALSHI, m["ticker"], title, yes_label=yes_label,
             no_label="No" if yes_label == "Yes" else f"Not {yes_label}",
-            subtitle=event.get("sub_title") or m.get("subtitle") or "",
+            # market titles often omit the event ("Full Game: Over 215.5 points"); keep it for matching
+            subtitle=" | ".join(x for x in (event.get("title") if event.get("title") and event.get("title") not in title
+                                             else "", event.get("sub_title") or m.get("subtitle") or "") if x),
             rules=f"{m.get('rules_primary', '')}\n{m.get('rules_secondary', '')}".strip(),
             resolution_source="; ".join(f"{s.get('name', '')} {s.get('url', '')}".strip() for s in sources),
             category=event.get("category") or "", event_id=m.get("event_ticker") or event.get("event_ticker", ""),

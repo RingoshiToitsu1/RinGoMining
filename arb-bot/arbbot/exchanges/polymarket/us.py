@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -23,6 +24,17 @@ TERMINAL = {"ORDER_STATE_FILLED", "ORDER_STATE_CANCELED", "ORDER_STATE_REJECTED"
             "ORDER_STATE_REPLACED"}
 INTENT = {(Side.BUY, Outcome.YES): "ORDER_INTENT_BUY_LONG", (Side.BUY, Outcome.NO): "ORDER_INTENT_BUY_SHORT",
           (Side.SELL, Outcome.YES): "ORDER_INTENT_SELL_LONG", (Side.SELL, Outcome.NO): "ORDER_INTENT_SELL_SHORT"}
+
+
+_LEAD = re.compile(r"^(?:this|the) market will (?:settle|resolve) to [\"“]?yes[\"”]? if\s+", re.I)
+
+
+def rules_headline(desc: str) -> str:
+    """'This market will settle to Yes if X records the most rushing yards ... in Week 10 ...' ->
+    'X records the most rushing yards ... in Week 10 ...'"""
+    first = re.split(r"(?<=[.?!])\s", desc.strip(), maxsplit=1)[0]
+    first = _LEAD.sub("", first).rstrip(".")
+    return (first[:1].upper() + first[1:])[:200] if len(first.split()) >= 4 else ""
 
 
 def _amount(a: Any) -> Decimal:
@@ -123,6 +135,11 @@ class PolymarketUSAdapter(ExchangeAdapter):
         else:
             yes_label, no_label = long_label, short_label or f"Not {long_label}"
         title = f"{question}: {subject}" if subject and subject not in question else (question or subject or slug)
+        desc = (m.get("description") or event.get("description") or "").strip()
+        if desc and (not question or question == subject or len(title.split()) <= 4):
+            # many contracts are titled only with a name ("Ollie Gordon II"); what they are actually
+            # about is in the first sentence of their own settlement rules
+            title = rules_headline(desc) or title
         end = parse_ts(m.get("endDate") or event.get("endDate") or event.get("endTime"))
         is_open = (bool(m.get("active", True)) and not m.get("closed") and not m.get("archived")
                    and m.get("status", "MARKET_STATUS_OPEN") == "MARKET_STATUS_OPEN")

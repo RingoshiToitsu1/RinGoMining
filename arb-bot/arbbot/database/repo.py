@@ -77,17 +77,29 @@ class Repository:
 
     # -- markets ---------------------------------------------------------------
     async def upsert_markets(self, markets: Sequence[Market]) -> None:
-        async with self.session() as s:
-            for m in markets:
-                row = await s.get(MarketRow, (m.exchange.value, m.market_id))
-                h = rules_hash(m)
-                if row:
-                    row.title, row.status, row.close_time = m.title, m.status, m.close_time
-                    row.rules_hash, row.data = h, m.to_dict()
-                else:
-                    s.add(MarketRow(exchange=m.exchange.value, market_id=m.market_id, title=m.title,
-                                    status=m.status, close_time=m.close_time, rules_hash=h, data=m.to_dict()))
-            await s.commit()
+        """Bulk upsert: one lookup per 500 markets, writes only for new or changed ones."""
+        markets = list({m.key: m for m in markets}.values())
+        for c in range(0, len(markets), 500):
+            chunk = markets[c:c + 500]
+            async with self.session() as s:
+                by_ex: dict[str, list[str]] = {}
+                for m in chunk:
+                    by_ex.setdefault(m.exchange.value, []).append(m.market_id)
+                existing: dict[tuple[str, str], MarketRow] = {}
+                for ex, ids in by_ex.items():
+                    rows = (await s.execute(select(MarketRow).where(
+                        MarketRow.exchange == ex, MarketRow.market_id.in_(ids)))).scalars().all()
+                    existing.update({(r.exchange, r.market_id): r for r in rows})
+                for m in chunk:
+                    h = rules_hash(m)
+                    row = existing.get((m.exchange.value, m.market_id))
+                    if row is None:
+                        s.add(MarketRow(exchange=m.exchange.value, market_id=m.market_id, title=m.title,
+                                        status=m.status, close_time=m.close_time, rules_hash=h, data=m.to_dict()))
+                    elif row.rules_hash != h or row.status != m.status or (row.data or {}).get("fee") != m.fee.to_dict():
+                        row.title, row.status, row.close_time = m.title, m.status, m.close_time
+                        row.rules_hash, row.data = h, m.to_dict()
+                await s.commit()
 
     async def get_market(self, exchange: Exchange, market_id: str) -> Market | None:
         async with self.session() as s:

@@ -17,13 +17,14 @@ and settlement_compatible, which only stage 3 can grant.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Protocol
+from typing import Awaitable, Callable, Protocol
 
 from ..config.runtime import RuntimeConfig
 from ..database.repo import Repository, rules_hash
@@ -185,9 +186,11 @@ class VerifierVerdict:
 
 class MarketMatcher:
     def __init__(self, cfg: RuntimeConfig, repo: Repository, bus: EventBus, verifier: RuleVerifier | None = None,
-                 *, top_k: int = 3, min_similarity: float = 0.45, verify_above: float = 70.0):
+                 *, top_k: int = 2, min_similarity: float = 0.45, verify_above: float = 70.0,
+                 max_postings: int = 400):
         self.cfg, self.repo, self.bus, self.verifier = cfg, repo, bus, verifier
         self.top_k, self.min_similarity, self.verify_above = top_k, min_similarity, verify_above
+        self.max_postings = max_postings
 
     # -- stage 1: semantic candidates ---------------------------------------
     @staticmethod
@@ -196,6 +199,14 @@ class MarketMatcher:
         return tokens(f"{m.title} {m.subtitle} {label}")
 
     def candidates(self, kalshi: list[Market], poly: list[Market]) -> list[tuple[Market, Market, float]]:
+        """TF-IDF cosine over an inverted index, blocked by close date.
+
+        Two contracts can only be the same if they close around the same time, so the index is
+        keyed by (close day, token) and a market only looks at days within the close-time
+        tolerance. Tokens that appear in a huge number of same-day markets ("total", "over",
+        "win") carry almost no information and are skipped, which keeps this fast on
+        100k+ markets.
+        """
         docs_p = [self._doc(m) for m in poly]
         docs_k = [self._doc(m) for m in kalshi]
         df: Counter = Counter()
@@ -210,28 +221,45 @@ class MarketMatcher:
             norm = math.sqrt(sum(x * x for x in v.values())) or 1.0
             return {t: x / norm for t, x in v.items()}
 
-        vp = [vec(d) for d in docs_p]
-        index: dict[str, list[tuple[int, float]]] = defaultdict(list)
-        for i, v in enumerate(vp):
-            for t, w in v.items():
-                index[t].append((i, w))
+        def day(m: Market) -> int:
+            return int(m.close_time.timestamp() // 86400) if m.close_time else -1
+
+        span = int(math.ceil(self.cfg.close_time_tolerance_hours / 24)) + 1
+        index: dict[tuple[int, str], list[tuple[int, float]]] = defaultdict(list)
+        for i, d in enumerate(docs_p):
+            dd = day(poly[i])
+            for t, w in vec(d).items():
+                index[(dd, t)].append((i, w))
         out = []
         for k, dk in zip(kalshi, docs_k):
+            kd = day(k)
+            days = [-1] if kd < 0 else range(kd - span, kd + span + 1)
             scores: dict[int, float] = defaultdict(float)
             for t, w in vec(dk).items():
-                for i, wp in index.get(t, ()):
-                    scores[i] += w * wp
+                for dd in days:
+                    post = index.get((dd, t))
+                    if not post or len(post) > self.max_postings:
+                        continue
+                    for i, wp in post:
+                        scores[i] += w * wp
+            if not scores:
+                continue
             best = sorted(scores.items(), key=lambda kv: -kv[1])[: self.top_k]
-            out.extend((k, poly[i], s) for i, s in best if s >= self.min_similarity)
+            out.extend((k, poly[i], sc) for i, sc in best if sc >= self.min_similarity)
         return out
+
+    def similarity(self, k: Market, p: Market) -> float:
+        """Cosine similarity of one pair (tf weighting only; used outside discovery)."""
+        a, b = Counter(self._doc(k)), Counter(self._doc(p))
+        dot = sum(a[t] * b[t] for t in a.keys() & b.keys())
+        na, nb = math.sqrt(sum(v * v for v in a.values())), math.sqrt(sum(v * v for v in b.values()))
+        return dot / (na * nb) if na and nb else 0.0
 
     # -- stage 2: deterministic validation -----------------------------------
     def assess(self, k: Market, p: Market, similarity: float | None = None) -> MatchResult:
         cfg = self.cfg
         if similarity is None:
-            c = self.candidates([k], [p])
-            a, b = set(self._doc(k)), set(self._doc(p))
-            similarity = c[0][2] if c else (len(a & b) / len(a | b) if a | b else 0.0)
+            similarity = self.similarity(k, p)
         checks: dict = {"similarity": round(similarity, 4)}
         fails: list[str] = []
         tk, tp = f"{k.title} {k.subtitle}", f"{p.title} {p.subtitle}"
@@ -352,9 +380,21 @@ class MarketMatcher:
                                    kalshi=k.title, polymarket=p.title, new=existing is None)
         return mid, res
 
-    async def run(self, kalshi: list[Market], poly: list[Market]) -> dict[str, int]:
-        counts = {"candidates": 0, "verified": 0, "rejected": 0}
-        for k, p, sim in self.candidates(kalshi, poly):
+    async def run(self, kalshi: list[Market], poly: list[Market],
+                  prepare: "Callable[[Market], Awaitable[Market]] | None" = None) -> dict[str, int]:
+        """Screen every candidate pair in memory; only pairs that pass deterministic validation
+        (or that are already stored) touch the database or the rule verifier."""
+        counts = {"candidates": 0, "verified": 0, "rejected": 0, "screened": 0}
+        known = {(r.kalshi_id, r.polymarket_id) for r in await self.repo.mapping_rows(
+            ("verified", "candidate", "stale", "rejected"))}
+        pairs = await asyncio.to_thread(self.candidates, kalshi, poly)
+        for k, p, sim in pairs:
+            counts["screened"] += 1
+            if (k.market_id, p.market_id) not in known and not self.assess(k, p, sim).deterministic_ok:
+                counts["rejected"] += 1
+                continue
+            if prepare:
+                p = await prepare(p)
             _, res = await self.evaluate_pair(k, p, sim)
             if res.settlement_compatible and res.confidence >= self.cfg.min_match_confidence:
                 counts["verified"] += 1

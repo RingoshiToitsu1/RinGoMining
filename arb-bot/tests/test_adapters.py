@@ -211,6 +211,11 @@ async def test_polymarket_us_adapter():
                        "marketSides": [{"description": "Yes", "long": True}, {"description": "No", "long": False}]})
     assert team.title == "Major League Soccer Champion: Vancouver Whitecaps FC"
     assert team.yes_label == "Vancouver Whitecaps FC"
+    prop = us._market({"slug": "wk10-mostrushyds-ollgor", "question": "Ollie Gordon II", "title": "Ollie Gordon II",
+                       "endDate": "2026-11-16T05:00:00Z", "status": "MARKET_STATUS_OPEN",
+                       "description": "This market will settle to Yes if Ollie Gordon II records the most rushing yards "
+                                      "among all players in Week 10 of the 2026 Pro Football regular season. If two..."})
+    assert prop.title.startswith("Ollie Gordon II records the most rushing yards among all players in Week 10")
     book = await us.get_orderbook(m)
     assert book.best_ask(Outcome.YES) == D("0.51") and book.best_ask(Outcome.NO) == D("0.52")   # 1 - YES bid
     assert (await us.check_eligibility()).ok
