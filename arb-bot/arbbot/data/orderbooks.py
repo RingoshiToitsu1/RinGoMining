@@ -51,17 +51,24 @@ class OrderBookStore:
         return self._books.get(self.key(exchange, market_id))
 
     def vol_per_s(self, exchange: Exchange, market_id: str) -> float:
-        """Relative mid-price volatility per sqrt-second over the recent window."""
+        """Relative mid-price volatility per sqrt-second over the recent window.
+
+        Robust (median-based) on purpose: a one-off jump on one venue is the dislocation
+        being traded, not evidence that quotes will keep moving during the order latency.
+        """
         dq = self._mids.get(self.key(exchange, market_id))
-        if not dq or len(dq) < 3:
+        if not dq or len(dq) < 4:
             return 0.0
-        sq, span = 0.0, dq[-1][0] - dq[0][0]
-        prev = dq[0][1]
-        for _, mid in list(dq)[1:]:
-            if prev > 0:
-                sq += ((mid - prev) / prev) ** 2
-            prev = mid
-        return math.sqrt(sq / span) if span > 0 else 0.0
+        pts = list(dq)
+        rates = []
+        for (t0, m0), (t1, m1) in zip(pts, pts[1:]):
+            dt = t1 - t0
+            if m0 > 0 and dt > 0:
+                rates.append(abs(m1 - m0) / m0 / math.sqrt(dt))
+        if not rates:
+            return 0.0
+        rates.sort()
+        return 1.4826 * rates[len(rates) // 2]
 
     def last_update(self, exchange: Exchange) -> float:
         ts = [b.ts for k, b in self._books.items() if k.startswith(exchange.value + ":")]
@@ -75,16 +82,16 @@ class BookFeed:
                  interval: Callable[[], float], recorder: Callable[[OrderBook], None] | None = None):
         self.adapters, self.store, self.bus = adapters, store, bus
         self._interval = interval
-        self._watch: dict[Exchange, dict[str, Market]] = {e: {} for e in adapters}
+        self._watch: dict[Exchange, dict[str, Market]] = {e: {} for e in Exchange}
         self._stream_tasks: dict[Exchange, asyncio.Task] = {}
         self._stream_sig: dict[Exchange, frozenset[str]] = {}
         self._recorder = recorder
-        self.last_ok: dict[Exchange, float] = {e: 0.0 for e in adapters}
-        self.errors: dict[Exchange, int] = {e: 0 for e in adapters}
-        self._up: dict[Exchange, bool] = {e: True for e in adapters}
+        self.last_ok: dict[Exchange, float] = {e: 0.0 for e in Exchange}
+        self.errors: dict[Exchange, int] = {e: 0 for e in Exchange}
+        self._up: dict[Exchange, bool] = {e: True for e in Exchange}
 
     def watch(self, markets: list[Market]) -> None:
-        new: dict[Exchange, dict[str, Market]] = {e: {} for e in self.adapters}
+        new: dict[Exchange, dict[str, Market]] = {e: {} for e in Exchange}
         for m in markets:
             if m.exchange in new:
                 new[m.exchange][m.market_id] = m
@@ -153,7 +160,7 @@ class BookFeed:
     async def run(self) -> None:
         """REST polling is always on: it is the safety net under the streams."""
         while True:
-            for ex in self.adapters:
+            for ex in list(self.adapters):
                 self._ensure_stream(ex)
                 try:
                     await self.poll_once(ex)

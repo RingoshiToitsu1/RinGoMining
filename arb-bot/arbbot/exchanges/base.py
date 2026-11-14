@@ -53,6 +53,10 @@ class ExchangeAdapter(ABC):
     @abstractmethod
     async def get_market(self, market_id: str) -> Market | None: ...
 
+    async def enrich_market(self, market: Market) -> Market:
+        """Load per-market details (fees, tick size) that the listing endpoint lacks."""
+        return market
+
     @abstractmethod
     async def get_orderbook(self, market: Market) -> OrderBook: ...
 

@@ -229,6 +229,7 @@ class PaperExchange(SimExchange):
         self._data_get_resolution = data.get_resolution
         self._data_health = data.health
         self._data_stream = data.stream_orderbooks
+        self._data_enrich = data.enrich_market
         self.supports_streaming = data.supports_streaming
         self.conversion_bps = data.conversion_bps
 
@@ -240,6 +241,9 @@ class PaperExchange(SimExchange):
 
     async def get_market(self, market_id: str) -> Market | None:
         return await self._data_get_market(market_id)
+
+    async def enrich_market(self, market: Market) -> Market:
+        return await self._data_enrich(market)
 
     async def _book(self, market: Market) -> OrderBook:
         return await self._data_get_orderbook(market)

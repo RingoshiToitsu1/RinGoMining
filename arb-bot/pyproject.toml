@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "polymarket-us>=2.4",
+    "anthropic>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -39,5 +40,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E501", "E701", "E741", "B008", "B905"]

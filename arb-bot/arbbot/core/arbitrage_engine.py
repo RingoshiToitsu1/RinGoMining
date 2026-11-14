@@ -80,7 +80,7 @@ class ArbitrageEngine:
             a = self.execution.leg_input(m.kalshi, k_out, bk)
             b = self.execution.leg_input(m.polymarket, p_out, bp)
             ev = await self.allocator.plan(m, a, b, now=now, require_confidence=tradeable)
-            if not tradeable and ev.accepted:
+            if not tradeable and (ev.accepted or ev.reason.startswith("sizing: Kelly")):
                 ev = Evaluation(False, f"mapping not verified (confidence {m.confidence:.0f}); approve with "
                                        f"/mappings approve {m.id}", ev.quote, ev.required_roi, ev.risk_score,
                                 ev.days_to_settlement, ev.components)
