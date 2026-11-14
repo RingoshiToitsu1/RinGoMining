@@ -193,22 +193,42 @@ pools and never assumes money moves between them.
 
 ## Verified here, and not
 
-Verified by the test suite (`pytest`, 57 tests, also run against PostgreSQL 16 and Redis 7): fee and
-profit math, dynamic threshold behaviour, sizing and limits, matcher validation, every execution state
-including partial fills, emergency hedge, emergency unwind, unhedgeable residual, lost acknowledgement,
-crash recovery, settlement and settlement discrepancy, paper/live gating, all Telegram commands,
-restart persistence, and adapter request/response mapping against the shapes in the official SDKs.
+**Test suite** (`pytest`, 60 tests, also run against PostgreSQL 16 and Redis 7): fee and profit math,
+dynamic threshold, sizing and limits, matcher validation, every execution state (partial fills,
+emergency hedge, emergency unwind, unhedgeable residual, lost acknowledgement, crash recovery),
+settlement and settlement discrepancy, paper/live gating, every Telegram command, restart persistence,
+rate limiting, and adapter request/response mapping.
 
-**Not verified: live exchange behaviour.** The build environment had no network access to either
-exchange. Before real money, check these on Kalshi demo and with minimum-size orders:
+**Against the live exchanges (public market data, no account):**
+
+- Discovery read every open market on both venues: about 112,000 on Kalshi and 64,000 on Polymarket
+  US, almost all sports props. Matching them takes about 40 seconds, and a full discovery run about 10 minutes.
+- Matching found real cross-venue equivalents (for example the Week 10 "most rushing yards" props and
+  the Copa do Brasil winner markets) and correctly kept them below the trading bar until verified.
+  It also exposed a near miss worth knowing about: Kalshi lists both a per-game and a whole-week
+  "most rushing yards" market for the same player, and Polymarket US titles some markets with only the
+  player's name. The bot now builds those titles from the market's own rules, but this is exactly why
+  nothing trades without settlement-rule verification.
+- Read real order books on both venues and ran them through the profitability engine. At the time of
+  testing the matched pairs cost $1.02 to $1.07 per $1 payout: no arbitrage, which is the normal state.
+  Expect opportunities to be brief and rare.
+- **Rate limits are tight.** Kalshi returned HTTP 429 during the full event crawl and the public
+  Polymarket US gateway allowed roughly 20 requests a minute from the test machine (a shared IP, so
+  yours may be higher). The bot paces reads, halves its rate on every 429, polls each exchange in its
+  own loop, and only polls a few unverified candidates (`/settings max_watched_candidates`). With API keys
+  it streams books over WebSocket on both venues, which removes most of the polling.
+
+**Not verified: anything that needs an account.** Before real money, check these on Kalshi demo and
+with minimum-size orders:
 
 - Kalshi: the fields of a filled order (`taker_fill_cost_dollars`, `taker_fees_dollars`) for NO-side buys
   and for sells; WebSocket message field names (REST polling is the safety net and books are always
   refetched before an order).
 - Polymarket US: that short-side limit prices are quoted at the long price
-  (`POLYMARKET_US_SHORT_PRICE_CONVENTION`), the real fee rate (the bot learns it from the first order's
-  `commissionsBasisPoints`), and how `outcome` labels read on named-outcome markets.
-- Polymarket international: FAK/FOK size and price precision rules on fine-tick markets.
+  (`POLYMARKET_US_SHORT_PRICE_CONVENTION`); the fee model (markets publish a `feeCoefficient`, modelled as
+  coefficient × contracts × p × (1−p), and the bot reads the real commission back from every order);
+  the authenticated market-data WebSocket.
+- Polymarket international: order precision on fine-tick markets.
 
 The fee-discrepancy check pauses trading if an exchange charges more than the model expected.
 

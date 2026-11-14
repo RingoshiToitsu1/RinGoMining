@@ -49,7 +49,6 @@ class ArbitrageEngine:
         self._logged: dict[tuple[int, str], tuple[str, float, int]] = {}   # dedupe of journaled evaluations
         self._notified: dict[tuple[int, str], float] = {}
         self._scan_lock = asyncio.Lock()
-        self.max_watched_candidates = 25
 
     # -- mappings -------------------------------------------------------------
     async def reload_mappings(self) -> None:
@@ -59,7 +58,7 @@ class ArbitrageEngine:
         # review screen, so only the most promising few get order books (exchange rate limits)
         markets = []
         candidates = sorted((m for m in self.mappings if m.status == "candidate" and m.confidence >= 60),
-                            key=lambda m: -m.confidence)[: self.max_watched_candidates]
+                            key=lambda m: -m.confidence)[: self.cfg.max_watched_candidates]
         for m in [m for m in self.mappings if m.status == "verified"] + candidates:
             markets += [m.kalshi, m.polymarket]
         # markets behind open positions must stay watched too (for marks and closes)

@@ -24,7 +24,7 @@ SETTING_GROUPS = {
               "usdc_conversion_bps", "capital_cost_apr_pct", "settlement_risk_bps", "operational_risk_bps"],
     "matching": ["min_match_confidence", "close_time_tolerance_hours", "revalidate_hours"],
     "loops": ["scan_interval_s", "book_poll_interval_s", "discovery_interval_s", "settlement_check_interval_s",
-              "notify_opportunities", "daily_summary_hour_utc"],
+              "notify_opportunities", "daily_summary_hour_utc", "max_watched_candidates"],
     "paper": ["paper_kalshi_balance", "paper_polymarket_balance", "paper_fail_prob", "paper_partial_prob",
               "paper_min_days", "paper_min_trades", "paper_min_net_pnl", "paper_max_fail_rate_pct"],
 }

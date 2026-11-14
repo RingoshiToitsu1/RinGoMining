@@ -158,17 +158,31 @@ class BookFeed:
         self._stream_tasks[exchange] = asyncio.create_task(run(), name=f"stream-{exchange.value}")
 
     async def run(self) -> None:
-        """REST polling is always on: it is the safety net under the streams."""
-        while True:
-            for ex in list(self.adapters):
-                self._ensure_stream(ex)
-                try:
-                    await self.poll_once(ex)
-                except asyncio.CancelledError:
-                    raise
-                except Exception as e:
-                    log.warning("book poll failed on %s: %s", ex.value, e)
-            await asyncio.sleep(self._interval())
+        """One polling loop per exchange, so a slow or rate-limited venue never delays the
+        other's books. REST polling stays on under any stream as a safety net."""
+        tasks: dict[Exchange, asyncio.Task] = {}
+        try:
+            while True:
+                for ex in list(self.adapters):
+                    if ex not in tasks or tasks[ex].done():
+                        tasks[ex] = asyncio.create_task(self._poll_loop(ex), name=f"poll-{ex.value}")
+                await asyncio.sleep(5)
+        finally:
+            for t in tasks.values():
+                t.cancel()
+
+    async def _poll_loop(self, ex: Exchange) -> None:
+        while ex in self.adapters:
+            self._ensure_stream(ex)
+            try:
+                await self.poll_once(ex)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                log.warning("book poll failed on %s: %s", ex.value, str(e)[:200])
+            # a live stream keeps books fresh; REST then only needs to be an occasional check
+            streaming = ex in self._stream_tasks and not self._stream_tasks[ex].done()
+            await asyncio.sleep(self._interval() * (10 if streaming else 1))
 
     async def stop(self) -> None:
         for t in self._stream_tasks.values():

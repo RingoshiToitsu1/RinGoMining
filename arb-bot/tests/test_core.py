@@ -312,3 +312,23 @@ async def test_manual_approval_and_revalidation_demotes_changed_rules(h):
     m = await h.repo.get_mapping(mid)
     assert m.status == "stale" and not m.settlement_compatible
     assert any(e.data["kind"] == "matching_uncertain" for e in h.of("risk.alert"))
+
+
+async def test_slow_exchange_does_not_stall_the_other_feed(h):
+    import asyncio
+    await h.add_mapping()
+    h.books()
+    orig = h.poly.get_orderbooks
+
+    async def slow(markets):
+        await asyncio.sleep(0.5)
+        return await orig(markets)
+
+    h.poly.get_orderbooks = slow
+    task = asyncio.create_task(h.feed.run())
+    await asyncio.sleep(0.3)
+    kb = h.store.get(Exchange.KALSHI, "KXBTC-100K")
+    assert kb is not None and h.store.get(Exchange.POLYMARKET, "btc-100k-dec-31") is None
+    await asyncio.sleep(0.5)
+    assert h.store.get(Exchange.POLYMARKET, "btc-100k-dec-31") is not None
+    task.cancel()

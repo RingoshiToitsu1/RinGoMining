@@ -76,6 +76,7 @@ class RuntimeConfig(BaseModel):
     book_poll_interval_s: float = Field(1.5, ge=0.2, le=60)
     discovery_interval_s: float = Field(900.0, ge=30, le=86400)
     settlement_check_interval_s: float = Field(300.0, ge=10, le=86400)
+    max_watched_candidates: int = Field(10, ge=0, le=500, description="unverified pairs whose books are polled for review")
     notify_opportunities: bool = True
     daily_summary_hour_utc: int = Field(0, ge=0, le=23)
 
