@@ -9,3 +9,4 @@ var/
 *.egg-info/
 *.pem
 secrets/
+var-test/
