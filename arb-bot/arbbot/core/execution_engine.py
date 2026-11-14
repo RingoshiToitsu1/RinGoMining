@@ -200,6 +200,16 @@ class ExecutionEngine:
             self.profit.record_leg_result(leg.exchange, failed=res.filled_size < size)
         return res
 
+    async def _fresh_pair(self, a: Market, b: Market) -> tuple[OrderBook, OrderBook]:
+        """Fetch two books so both are fresh when used: the rate-limited venue (Polymarket) first,
+        then the fast one. Fetching them concurrently lets the fast book go stale while the slow
+        request waits for its rate-limit slot."""
+        if a.exchange is Exchange.POLYMARKET:
+            ba = await self._fresh_book(a)
+            return ba, await self._fresh_book(b)
+        bb = await self._fresh_book(b)
+        return await self._fresh_book(a), bb
+
     async def _fresh_book(self, market: Market) -> OrderBook:
         book = await asyncio.wait_for(self.venues[market.exchange].get_orderbook(market), timeout=10)
         await self.store.put_async(book)
@@ -247,7 +257,7 @@ class ExecutionEngine:
             return await fail(f"risk manager blocked trade: {why}")
         # 2-5: refresh both books, verify balances, size and price on fresh data
         try:
-            bk, bp = await asyncio.gather(self._fresh_book(k.market), self._fresh_book(p.market))
+            bk, bp = await self._fresh_pair(k.market, p.market)
         except Exception as e:
             return await fail(f"could not refresh order books: {e}")
         ok = await self.allocator.refresh_balances()
@@ -348,7 +358,7 @@ class ExecutionEngine:
         # Phase 1: complete the hedge while that loses less than unwinding.
         while ctx.unmatched > 0 and time.time() < deadline:
             try:
-                b2, b1 = await asyncio.gather(self._fresh_book(second.market), self._fresh_book(first.market))
+                b2, b1 = await self._fresh_pair(second.market, first.market)
             except Exception as e:
                 log.warning("hedge: book refresh failed: %s", e)
                 await asyncio.sleep(self._retry_delay)

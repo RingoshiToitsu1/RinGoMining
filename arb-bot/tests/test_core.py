@@ -168,6 +168,7 @@ async def test_risk_monitor_auto_pauses_and_self_heals(h):
     assert h.risk.trading_allowed()[0]
     h.kalshi.healthy = False                 # API outage: health + balance checks fail
     await h.risk.monitor_once()
+    await h.risk.monitor_once()              # an outage must persist across two checks
     ok, why = h.risk.trading_allowed()
     assert not ok and "kalshi" in why
     assert "exchange_unavailable:kalshi" in h.risk.pauses and "balance_unverified:kalshi" in h.risk.pauses

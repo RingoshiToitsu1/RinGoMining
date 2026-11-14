@@ -40,6 +40,7 @@ class RiskManager:
         self.pauses: dict[str, str] = {}       # condition key -> human reason
         self.eligibility: dict[Exchange, bool] = {}
         self._daily_loss_day: str = ""
+        self._down_count: dict[Exchange, int] = {}
 
     # -- persistence -----------------------------------------------------------
     async def load(self) -> None:
@@ -176,8 +177,12 @@ class RiskManager:
             except Exception:
                 up = False
             if not up:
-                await self.trip(key, f"{ex.value} API unavailable")
+                # one failed probe is noise; two in a row (~30s apart) is an outage
+                self._down_count[ex] = self._down_count.get(ex, 0) + 1
+                if self._down_count[ex] >= 2:
+                    await self.trip(key, f"{ex.value} API unavailable")
             else:
+                self._down_count[ex] = 0
                 await self.clear(key, f"{ex.value} API reachable again")
             skey = f"stale_books:{ex.value}"
             limit = max(cfg.max_book_age_ms / 1000 * 10, 30.0)

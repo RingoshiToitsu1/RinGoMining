@@ -127,10 +127,10 @@ class PolymarketUSAdapter(ExchangeAdapter):
 
     async def health(self) -> bool:
         try:
-            await self._call(lambda: self.c.markets.list({"limit": 1, "active": True}))
+            await self._call(lambda: self.c.markets.list({"limit": 1, "active": True}), retries=1)
             return True
-        except ExchangeError:
-            return False
+        except ExchangeError as e:
+            return "rate limited" in str(e)      # rate limited means reachable, not down
 
     # -- discovery -------------------------------------------------------------------
     def _fee(self, m: dict | None = None) -> FeeSpec:

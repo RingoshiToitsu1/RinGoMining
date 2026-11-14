@@ -159,10 +159,10 @@ class KalshiAdapter(ExchangeAdapter):
 
     async def health(self) -> bool:
         try:
-            st = await self._request("GET", "/exchange/status", retries=0)
+            st = await self._request("GET", "/exchange/status", retries=1)
             return bool(st.get("exchange_active", True))
-        except ExchangeError:
-            return False
+        except ExchangeError as e:
+            return "HTTP 429" in str(e)          # rate limited means reachable, not down
 
     # -- discovery ---------------------------------------------------------------
     async def _load_series_fees(self) -> None:

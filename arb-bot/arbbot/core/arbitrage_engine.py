@@ -183,8 +183,9 @@ class ArbitrageEngine:
             opps: list[Opportunity] = []
             for _, m in gaps[: self.cfg.screen_max_deep]:
                 try:
-                    bk, bp = await asyncio.gather(self.venues[Exchange.KALSHI].get_orderbook(m.kalshi),
-                                                  self.venues[Exchange.POLYMARKET].get_orderbook(m.polymarket))
+                    # rate-limited venue first, so the Kalshi book is still fresh when evaluated
+                    bp = await self.venues[Exchange.POLYMARKET].get_orderbook(m.polymarket)
+                    bk = await self.venues[Exchange.KALSHI].get_orderbook(m.kalshi)
                 except Exception as e:
                     log.warning("order books for mapping %s unavailable: %s", m.id, str(e)[:160])
                     continue

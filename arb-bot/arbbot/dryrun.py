@@ -166,7 +166,7 @@ def main() -> None:
     ap.add_argument("--hours", type=float, default=12.0)
     ap.add_argument("--bankroll", type=float, default=2000.0)
     ap.add_argument("--max-trade", type=float, default=200.0)
-    ap.add_argument("--interval", type=float, default=4.0, help="seconds between quote screens")
+    ap.add_argument("--interval", type=float, default=6.0, help="seconds between quote screens")
     ap.add_argument("--days", type=int, default=3, help="contracts settling within this many days")
     ap.add_argument("--heartbeat", type=float, default=300.0, help="seconds between status lines")
     ap.add_argument("--workdir", default="var/dryrun")
