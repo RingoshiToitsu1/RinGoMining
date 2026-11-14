@@ -402,3 +402,5 @@ async def test_screen_mode_finds_gap_from_quotes_and_paper_trades_it(h):
     assert any(o.evaluation.accepted for o in opps)
     assert h.engine.screen_stats["deep"] == 1
     assert len(await h.repo.open_positions("paper")) == 1
+    await h.engine.screen_once()                # same quotes again: no repeat full-book check
+    assert h.engine.screen_stats["deep"] == 0

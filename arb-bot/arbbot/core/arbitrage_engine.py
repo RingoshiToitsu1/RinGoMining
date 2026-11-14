@@ -50,12 +50,15 @@ class ArbitrageEngine:
         self._notified: dict[tuple[int, str], float] = {}
         self._scan_lock = asyncio.Lock()
         self.screen_mode = False
+        self._deep_seen: dict[int, tuple] = {}
+        self._deep_ts: dict[int, float] = {}
         self.screen_stats: dict = {}
 
     # -- mappings -------------------------------------------------------------
     async def reload_mappings(self) -> None:
         """Verified mappings are traded; candidates are evaluated for display only."""
         self.mappings = await self.repo.list_mappings(("verified", "candidate"), limit=2000)
+        self._deep_seen.clear()        # approvals or rule changes alter verdicts even at the same prices
         # verified pairs are traded and always watched; unverified candidates only feed the
         # review screen, so only the most promising few get order books (exchange rate limits)
         markets = []
@@ -178,6 +181,10 @@ class ArbitrageEngine:
                             stats["best_pair"] = (f"{m.kalshi.market_id} {k_out.value.upper()} @ {ka} + "
                                                   f"{m.polymarket.market_id} {p_out.value.upper()} @ {pa}")
                 if best is not None and best < 1:
+                    # a pair whose quotes have not moved since its last full-book check would
+                    # get the same verdict: skip it and save the rate-limited request budget
+                    if self._deep_seen.get(m.id) == (a, b) and time.time() - self._deep_ts.get(m.id, 0) < 120:
+                        continue
                     gaps.append((best, m))
             gaps.sort(key=lambda x: x[0])
             opps: list[Opportunity] = []
@@ -191,6 +198,8 @@ class ArbitrageEngine:
                     continue
                 await self.store.put_async(bk)
                 await self.store.put_async(bp)
+                self._deep_seen[m.id] = (kq.get(m.kalshi.market_id), pq.get(m.polymarket.market_id))
+                self._deep_ts[m.id] = time.time()
                 stats["deep"] += 1
                 opps.extend(await self.evaluate_mapping(m))
             self.screen_stats = stats
