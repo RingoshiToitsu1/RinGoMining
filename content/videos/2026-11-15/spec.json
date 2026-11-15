@@ -1,0 +1,51 @@
+{
+ "01-3-month-low-my-move": [
+  {"photo": null, "text": "Bitcoin just hit a *3-month low*", "size": 100},
+  {"photo": null, "text": "Under *$73K*"},
+  {"photo": null, "text": "My move?", "sub": "Same as always"},
+  {"photo": null, "text": "Keep mining. *Keep reinvesting.*", "sub": "Every reward buys more bitcoin when it's low"},
+  {"end": true}
+ ],
+ "02-mine-exchange-repeat": [
+  {"photo": null, "text": "*Mine. Exchange. Repeat.*", "size": 110},
+  {"photo": "../../content/videos/2026-11-15/src/doodle-loop.png", "text": "My whole bitcoin loop", "text_y": 280},
+  {"photo": null, "text": "Rewards land *every day*"},
+  {"photo": null, "text": "Cash out or *reinvest*", "sub": "I reinvest almost all of it"},
+  {"end": true}
+ ],
+ "03-gomining-bestchange": [
+  {"photo": null, "text": "GoMining just *teamed up* with BestChange", "size": 96},
+  {"photo": null, "text": "One mines your bitcoin", "sub": "The other helps you move it"},
+  {"photo": null, "text": "Joint activities *coming soon*"},
+  {"photo": null, "text": "I'll tell you if it's *worth it*", "sub": "Follow so you don't miss it"},
+  {"end": true}
+ ],
+ "04-mining-from-the-couch": [
+  {"photo": "../../content/videos/2026-11-15/src/doodle-couch.png", "text": "How I mine bitcoin *from the couch*", "text_y": 260},
+  {"photo": null, "text": "Their machines", "sub": "Their data centers. Their power bill."},
+  {"photo": null, "text": "My rewards *every day*"},
+  {"photo": "fire-racks-wide.jpg", "text": "Way better than *my old setup*"},
+  {"end": true}
+ ],
+ "05-skin-in-the-game": [
+  {"photo": null, "text": "Most bitcoin takes: *\"it'll go up\"*", "size": 96},
+  {"photo": null, "text": "Cool. *Then what?*"},
+  {"photo": null, "text": "I get paid *while I wait*", "sub": "Mining rewards every single day"},
+  {"photo": "../../content/videos/2026-11-15/src/dashboard-nov.png", "text": "Almost *$40K* mined so far", "text_y": 300},
+  {"end": true}
+ ],
+ "06-day-one-advice": [
+  {"photo": null, "text": "What I'd tell myself on *day 1*", "size": 104},
+  {"photo": null, "text": "1. Put the code on *first*", "sub": "Before your first purchase"},
+  {"photo": null, "text": "2. Do the *Academy*", "sub": "It grows your bonus miner"},
+  {"photo": null, "text": "3. Start with *15W* and start small"},
+  {"photo": null, "text": "4. Think in *years*", "sub": "Not days"},
+  {"end": true}
+ ],
+ "07-thankful": [
+  {"photo": null, "text": "This Thanksgiving I'm thankful for *one thing*", "size": 92},
+  {"photo": "fire-whatsminers.jpg", "text": "My miners *can't catch fire* anymore"},
+  {"photo": null, "text": "No machines in my house", "sub": "Still mining every day"},
+  {"end": true}
+ ]
+}
