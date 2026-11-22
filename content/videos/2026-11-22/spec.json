@@ -1,0 +1,52 @@
+{
+ "01-black-friday-buy": [
+  {"photo": null, "text": "My *Black Friday* buy this year", "size": 104},
+  {"photo": null, "text": "Not a TV. Not shoes."},
+  {"photo": null, "text": "*More terahash*", "sub": "Bitcoin's down, so every reward stacks more of it"},
+  {"photo": null, "text": "Only spend what you can *afford to lose*", "sub": "That's how I do it"},
+  {"end": true}
+ ],
+ "02-red-candles": [
+  {"photo": null, "text": "*Red candles* all week", "size": 110},
+  {"photo": null, "text": "My miners didn't notice"},
+  {"photo": "../../content/videos/2026-11-22/src/dashboard-nov.png", "text": "Paid out *every single day*", "text_y": 300},
+  {"photo": null, "text": "Price drops. *Mining doesn't stop.*"},
+  {"end": true}
+ ],
+ "03-what-gomining-does": [
+  {"photo": null, "text": "What does GoMining *actually do?*", "size": 104},
+  {"photo": null, "text": "1. You buy *terahash*", "sub": "That's mining power"},
+  {"photo": null, "text": "2. They run the *machines*", "sub": "Their data centers. Their power bill."},
+  {"photo": "../../content/videos/2026-11-22/src/doodle-couch.png", "text": "3. You get bitcoin *every day*", "text_y": 260},
+  {"end": true}
+ ],
+ "04-honest-risk": [
+  {"photo": null, "text": "The *honest risk* nobody mentions", "size": 104},
+  {"photo": null, "text": "Miners resell at a *discount*", "sub": "This isn't a quick flip"},
+  {"photo": null, "text": "Bitcoin can keep *going down*", "sub": "Before it goes back up"},
+  {"photo": null, "text": "So I only invest what I can *afford to lose*"},
+  {"end": true}
+ ],
+ "05-day-1-vs-month-18": [
+  {"photo": null, "text": "*Day 1* vs *Month 18*", "size": 120},
+  {"photo": null, "text": "May 2025: about *$20K* in", "sub": "One miner. Lots of questions."},
+  {"photo": "../../content/videos/2026-11-22/src/miners-list.png", "text": "Now: *19 miners*, 7,000 TH", "text_y": 260},
+  {"photo": null, "text": "Almost *$40K* mined", "sub": "Reinvested almost every reward"},
+  {"end": true}
+ ],
+ "06-scary-headlines": [
+  {"photo": null, "text": "Scary crypto headlines *again*", "size": 104},
+  {"photo": null, "text": "My miners don't *read the news*"},
+  {"photo": null, "text": "They just *keep mining*", "sub": "Every day, rain or shine"},
+  {"photo": null, "text": "Think in *years*", "sub": "Not headlines"},
+  {"end": true}
+ ],
+ "07-your-first-week": [
+  {"photo": null, "text": "Your *first week* on GoMining", "size": 104},
+  {"photo": null, "text": "Day 1: sign up with *RINGO5*", "sub": "Before your first purchase"},
+  {"photo": null, "text": "Day 2: do the *Academy*", "sub": "It grows your bonus miner"},
+  {"photo": null, "text": "Day 3: buy your first *terahash*", "sub": "15W miners. Start small."},
+  {"photo": null, "text": "Day 4+: watch it *mine*", "sub": "Rewards every day"},
+  {"end": true}
+ ]
+}
